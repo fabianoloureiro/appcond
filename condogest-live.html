@@ -414,14 +414,13 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <script>
-const SURL = 'https://nwcbtprfsekbgqkgnkya.supabase.co';
-const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53Y2J0cHJmc2VrYmdxa2dua3lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTUwMzksImV4cCI6MjA4ODc5MTAzOX0.9rBbRd6WMhoYzhno_nacqHDgRB_X84FZBnMTCd6iS6M';
-const CONDO = '11111111-0000-0000-0000-000000000001';
-const { createClient } = supabase;
-const db = createClient(SURL, SKEY);
+var SURL = 'https://nwcbtprfsekbgqkgnkya.supabase.co';
+var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53Y2J0cHJmc2VrYmdxa2dua3lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTUwMzksImV4cCI6MjA4ODc5MTAzOX0.9rBbRd6WMhoYzhno_nacqHDgRB_X84FZBnMTCd6iS6M';
+var CONDO = '11111111-0000-0000-0000-000000000001';
+var db = supabase.createClient(SURL, SKEY);
 
-let curPage = 'dashboard';
-let user = null;
+var curPage = 'dashboard';
+var user = null;
 
 // AUTH - usa onAuthStateChange para garantir que funciona no GitHub Pages
 var authDone = false;
@@ -620,7 +619,8 @@ async function loadAcesso() {
   var tb = document.getElementById('a-tbody');
   tb.innerHTML = todos.length ? todos.map(function(v){
     var saida = v.saida_em ? '<span class="muted">&#8595; '+fmtH(v.saida_em)+'</span>' : '<span class="cyellow">&#9679; dentro</span>';
-    var btn = !v.saida_em ? '<button class="btn red-soft sm" data-id="'+v.id+'" onclick="regSaida(this.getAttribute('data-id'))">Registrar saída</button>' : '';
+    var btnId = v.id;
+    var btn = !v.saida_em ? '<button class="btn red-soft sm" onclick="regSaida(\'' + btnId + '\')">Registrar sa&#237;da</button>' : '';
     return '<tr><td data-l="Nome"><strong>'+v.nome+'</strong></td><td data-l="Doc">'+(v.documento||'—')+'</td><td data-l="Tipo">'+chip(v.tipo)+'</td><td data-l="Entrada" class="cgreen">&#8593; '+fmtH(v.entrada_em)+'</td><td data-l="Saída">'+saida+'</td><td data-l="Ações">'+btn+'</td></tr>';
   }).join('') : '<tr><td colspan="6"><div class="empty"><div class="empty-ico">&#128272;</div>Nenhum visitante hoje</div></td></tr>';
 }
@@ -786,7 +786,7 @@ async function loadBalancetes() {
       '</div>' +
       '<div class="flex gap8">' +
         '<a href="' + d.arquivo_url + '" target="_blank" class="btn outline sm">&#128065; Ver PDF</a>' +
-        '<button class="btn primary sm" data-url="' + d.arquivo_url + '" data-nome="' + d.nome + '" onclick="abrirChatIA(this.getAttribute('data-url'), this.getAttribute('data-nome'))">&#129302; Analisar IA</button>' +
+        '<button class="btn primary sm" onclick="abrirChatIA(\'' + d.arquivo_url.replace(/\'/g,\'\') + '\',\'' + d.nome.replace(/\'/g,\'\') + '\')">&#129302; Analisar IA</button>' +
       '</div>' +
     '</div>';
   }).join('');
