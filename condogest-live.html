@@ -378,13 +378,13 @@ var SURL  = 'https://nwcbtprfsekbgqkgnkya.supabase.co';
 var SKEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53Y2J0cHJmc2VrYmdxa2dua3lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTUwMzksImV4cCI6MjA4ODc5MTAzOX0.9rBbRd6WMhoYzhno_nacqHDgRB_X84FZBnMTCd6iS6M';
 var CONDO = '11111111-0000-0000-0000-000000000001';
 var BURL  = 'https://nwcbtprfsekbgqkgnkya.supabase.co/storage/v1/object/public/Balancetes/';
+// IDs reais do banco
 var AREA_SALAO   = 'aaaaaaaa-0000-0000-0000-000000000001';
 var AREA_CHURRAS = 'aaaaaaaa-0000-0000-0000-000000000002';
 var AREA_GOURMET = 'aaaaaaaa-0000-0000-0000-000000000003';
-// Conflito: churrasqueira bloqueia gourmet e vice-versa
+// IDs das áreas que já existiam no banco (serão usados dinamicamente)
+// Conflito: churrasqueira bloqueia gourmet e vice-versa — definido após carregar áreas
 var CONFLITO = {};
-CONFLITO[AREA_CHURRAS] = AREA_GOURMET;
-CONFLITO[AREA_GOURMET] = AREA_CHURRAS;
 
 var db = supabase.createClient(SURL, SKEY);
 var cur = 'dash';
@@ -437,7 +437,23 @@ async function init(sess) {
     var cd = await db.from('condominios').select('nome').eq('id', CONDO).single();
     if (cd.data) document.getElementById('sb-cn').textContent = cd.data.nome;
     var ar = await db.from('areas_comuns').select('*').eq('condominio_id', CONDO).eq('ativa', true);
-    _areas = ar.data || [];
+    // Filtra as 3 areas corretas, sem duplicatas
+    var todasAreas = ar.data || [];
+    var nomesAlvo = ['Salao de Festas', 'Churrasqueira', 'Espaco Gourmet'];
+    var nomesReais = {'Salao de Festas':'Salão de Festas','Churrasqueira':'Churrasqueira','Espaco Gourmet':'Espaço Gourmet'};
+    _areas = [];
+    // Monta lista sem duplicar: prefere IDs aaaaaaaa-
+    ['Salão de Festas','Churrasqueira','Espaço Gourmet'].forEach(function(nm) {
+      var found = todasAreas.filter(function(a){ return a.nome === nm; });
+      var pref = found.filter(function(a){ return a.id.indexOf('aaaaaaaa') === 0; })[0];
+      if (pref) _areas.push(pref);
+      else if (found.length) _areas.push(found[0]);
+    });
+    // Conflito dinamico: Churrasqueira bloqueia Espaco Gourmet
+    CONFLITO = {};
+    var aC = _areas.filter(function(a){ return a.nome==='Churrasqueira'; })[0];
+    var aG = _areas.filter(function(a){ return a.nome==='Espaço Gourmet'; })[0];
+    if (aC && aG) { CONFLITO[aC.id] = aG.id; CONFLITO[aG.id] = aC.id; }
     await lPg('dash');
   } catch(e) {
     console.error(e);
