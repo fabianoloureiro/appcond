@@ -383,9 +383,11 @@ let roleSelecionado = 'sindico'
 //  CHECAR SESSÃO ATIVA
 // ══════════════════════════════════════════
 ;(async () => {
-  const { data: { session } } = await db.auth.getSession()
-  if (session) {
-    await redirecionarPorRole(session.user)
+  // Só redireciona se vier de um login recente (via hash token do Supabase)
+  const hash = window.location.hash
+  if (hash && hash.includes('access_token')) {
+    const { data: { session } } = await db.auth.getSession()
+    if (session) { await redirecionarPorRole(session.user) }
   }
 })()
 

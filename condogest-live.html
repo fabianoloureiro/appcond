@@ -423,34 +423,43 @@ const db = createClient(SURL, SKEY);
 let curPage = 'dashboard';
 let user = null;
 
-// AUTH
-(async function() {
-  var sess = await db.auth.getSession();
-  if (!sess.data.session) { window.location.href = 'condogest-login.html'; return; }
+// AUTH - usa onAuthStateChange para garantir que funciona no GitHub Pages
+var authDone = false;
+db.auth.onAuthStateChange(async function(event, session) {
+  if (authDone) return;
+  if (!session) {
+    window.location.href = 'index.html';
+    return;
+  }
+  authDone = true;
   var saved = localStorage.getItem('cg_user');
   user = saved ? JSON.parse(saved) : null;
   if (!user) {
-    var pr = await db.from('perfis').select('nome,role,condominio_id').eq('id', sess.data.session.user.id).single();
+    var pr = await db.from('perfis').select('nome,role,condominio_id').eq('id', session.user.id).single();
     if (pr.data) {
-      user = { id: sess.data.session.user.id, email: sess.data.session.user.email, nome: pr.data.nome, role: pr.data.role, condominio_id: pr.data.condominio_id };
+      user = { id: session.user.id, email: session.user.email, nome: pr.data.nome, role: pr.data.role, condominio_id: pr.data.condominio_id };
       localStorage.setItem('cg_user', JSON.stringify(user));
     }
   }
-  if (user) {
-    var ini = user.nome.split(' ').slice(0,2).map(function(n){ return n[0]; }).join('').toUpperCase();
-    document.getElementById('sb-av').textContent = ini;
-    document.getElementById('sb-nome').textContent = user.nome;
-    document.getElementById('sb-role').textContent = user.role;
-    if (user.role === 'morador') {
-      var els = document.querySelectorAll('[data-p="financeiro"],[data-p="acesso"]');
-      for (var i=0;i<els.length;i++) els[i].remove();
-    }
+  if (!user) { window.location.href = 'index.html'; return; }
+  var ini = user.nome.split(' ').slice(0,2).map(function(n){ return n[0]; }).join('').toUpperCase();
+  document.getElementById('sb-av').textContent = ini;
+  document.getElementById('sb-nome').textContent = user.nome;
+  document.getElementById('sb-role').textContent = user.role;
+  if (user.role === 'morador') {
+    var els = document.querySelectorAll('[data-p="financeiro"],[data-p="acesso"]');
+    for (var i=0;i<els.length;i++) els[i].remove();
   }
   var condo = await db.from('condominios').select('nome').eq('id', CONDO).single();
   if (condo.data) document.getElementById('sb-condo').textContent = condo.data.nome;
   await loadPage('dashboard');
   document.getElementById('loading').classList.add('hidden');
-}());
+});
+
+// Timeout de segurança — se não autenticar em 5s, volta pro login
+setTimeout(function() {
+  if (!authDone) { window.location.href = 'index.html'; }
+}, 5000);
 
 // UTILS
 function hide(id){ document.getElementById(id).classList.add('hidden'); }
