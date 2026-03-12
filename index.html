@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>CondoGest — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b24; --card: #1c2333; --border: #253047;
+    --accent: #3b82f6; --accent-l: #3b82f615; --accent-d: #2563eb;
+    --green: #10d48e; --green-l: #10d48e20;
+    --red: #f43f5e; --red-l: #f43f5e20;
+    --yellow: #fbbf24;
+    --text: #e2e8f0; --muted: #64748b; --muted2: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px 20px;
+  }
+
+  /* BG GLOW */
+  body::before {
+    content: '';
+    position: fixed; top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, #3b82f615 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .auth-container {
+    width: 100%; max-width: 400px;
+    animation: fadeUp 0.4s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* LOGO */
+  .logo-wrap {
+    text-align: center; margin-bottom: 32px;
+  }
+  .logo-icon {
+    width: 64px; height: 64px; border-radius: 18px;
+    background: var(--accent); margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+    box-shadow: 0 8px 32px #3b82f640;
+  }
+  .logo-title {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.5px;
+  }
+  .logo-badge {
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 800;
+    padding: 2px 6px; border-radius: 4px;
+    margin-left: 6px; letter-spacing: 1px;
+    vertical-align: middle;
+  }
+  .logo-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* TABS */
+  .tabs {
+    display: flex; background: var(--surface);
+    border-radius: 12px; padding: 4px;
+    margin-bottom: 24px; border: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1; text-align: center; padding: 10px;
+    border-radius: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; color: var(--muted); transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--accent); color: #fff;
+    box-shadow: 0 2px 8px #3b82f640;
+  }
+
+  /* CARD */
+  .auth-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 28px 24px;
+  }
+
+  /* FORM */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    font-size: 11px; font-weight: 700; color: var(--muted2);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 7px; display: block;
+  }
+  .input-wrap { position: relative; }
+  .form-input {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 16px; color: var(--text);
+    font-family: inherit; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input.error { border-color: var(--red); }
+  .input-icon {
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%); font-size: 16px;
+    cursor: pointer; color: var(--muted);
+  }
+
+  /* ROLE SELECTOR */
+  .role-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 16px;
+  }
+  .role-card {
+    border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 12px 10px; text-align: center; cursor: pointer;
+    transition: all 0.2s; background: var(--surface);
+  }
+  .role-card:hover { border-color: var(--accent); }
+  .role-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-l);
+  }
+  .role-icon { font-size: 22px; margin-bottom: 5px; }
+  .role-label { font-size: 11px; font-weight: 700; color: var(--muted2); }
+  .role-card.selected .role-label { color: var(--accent); }
+
+  /* BUTTON */
+  .btn-primary {
+    width: 100%; background: var(--accent);
+    color: #fff; border: none; border-radius: 12px;
+    padding: 14px; font-weight: 800; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 8px;
+  }
+  .btn-primary:hover  { background: var(--accent-d); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .btn-ghost {
+    width: 100%; background: transparent;
+    color: var(--muted2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px;
+    font-weight: 600; font-size: 13px;
+    cursor: pointer; font-family: inherit;
+    margin-top: 10px; transition: border-color 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* DIVIDER */
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 20px 0; color: var(--muted); font-size: 12px;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ALERT */
+  .alert {
+    border-radius: 10px; padding: 12px 14px;
+    font-size: 13px; font-weight: 500; margin-bottom: 16px;
+    display: none;
+  }
+  .alert.error   { background: var(--red-l);   color: var(--red);   border: 1px solid #f43f5e30; display: block; }
+  .alert.success { background: var(--green-l); color: var(--green); border: 1px solid #10d48e30; display: block; }
+
+  /* SPINNER */
+  .spinner-sm {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid #ffffff44; border-top-color: #fff;
+    animation: spin 0.7s linear infinite;
+    display: inline-block; vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* PERFIL INFO */
+  .perfil-info {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+  }
+  .perfil-avatar {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: var(--accent); display: flex;
+    align-items: center; justify-content: center;
+    font-weight: 800; font-size: 16px; color: #fff; flex-shrink: 0;
+  }
+
+  /* FORGOT */
+  .forgot-link {
+    text-align: right; font-size: 12px; color: var(--accent);
+    font-weight: 600; cursor: pointer; margin-top: -8px; margin-bottom: 16px;
+  }
+
+  /* FOOTER */
+  .auth-footer {
+    text-align: center; margin-top: 24px;
+    font-size: 12px; color: var(--muted);
+  }
+
+  /* TELA SUCESSO */
+  .success-screen {
+    display: none; text-align: center;
+    animation: fadeUp 0.4s ease;
+  }
+  .success-screen.show { display: block; }
+  .success-icon {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: var(--green-l); border: 2px solid var(--green);
+    margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+  }
+
+  /* RESET */
+  .reset-screen { display: none; }
+  .reset-screen.show { display: block; }
+
+  select.form-input option { background: var(--card); }
+</style>
+</head>
+<body>
+
+<div class="auth-container">
+
+  <!-- LOGO -->
+  <div class="logo-wrap">
+    <div class="logo-icon">🏢</div>
+    <div class="logo-title">CondoGest<span class="logo-badge">PRO</span></div>
+    <div class="logo-sub">Sistema de gestão de condomínios</div>
+  </div>
+
+  <!-- ALERTA GLOBAL -->
+  <div class="alert" id="alert"></div>
+
+  <!-- TELA PRINCIPAL (login/cadastro) -->
+  <div id="main-screen">
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" id="tab-login"    onclick="setTab('login')">Entrar</div>
+      <div class="tab"        id="tab-cadastro" onclick="setTab('cadastro')">Criar conta</div>
+    </div>
+
+    <!-- CARD LOGIN -->
+    <div class="auth-card" id="form-login">
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input class="form-input" id="l-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <div class="input-wrap">
+          <input class="form-input" id="l-senha" type="password" placeholder="Sua senha" autocomplete="current-password"/>
+          <span class="input-icon" onclick="toggleSenha('l-senha', this)">👁️</span>
+        </div>
+      </div>
+      <div class="forgot-link" onclick="mostrarReset()">Esqueci minha senha</div>
+      <button class="btn-primary" id="btn-login" onclick="fazerLogin()">Entrar</button>
+      <div class="divider">ou</div>
+      <button class="btn-ghost" onclick="setTab('cadastro')">Criar uma conta</button>
+    </div>
+
+    <!-- CARD CADASTRO -->
+    <div class="auth-card" id="form-cadastro" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Nome completo</label>
+        <input class="form-input" id="c-nome" type="text" placeholder="Seu nome completo"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input class="form-input" id="c-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefone</label>
+        <input class="form-input" id="c-tel" type="tel" placeholder="(11) 99999-9999"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <div class="input-wrap">
+          <input class="form-input" id="c-senha" type="password" placeholder="Mínimo 6 caracteres"/>
+          <span class="input-icon" onclick="toggleSenha('c-senha', this)">👁️</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmar senha</label>
+        <div class="input-wrap">
+          <input class="form-input" id="c-senha2" type="password" placeholder="Repita a senha"/>
+          <span class="input-icon" onclick="toggleSenha('c-senha2', this)">👁️</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Seu perfil</label>
+        <div class="role-grid">
+          <div class="role-card selected" data-role="sindico" onclick="selecionarRole(this)">
+            <div class="role-icon">👔</div>
+            <div class="role-label">Síndico</div>
+          </div>
+          <div class="role-card" data-role="morador" onclick="selecionarRole(this)">
+            <div class="role-icon">🏠</div>
+            <div class="role-label">Morador</div>
+          </div>
+          <div class="role-card" data-role="zelador" onclick="selecionarRole(this)">
+            <div class="role-icon">🔧</div>
+            <div class="role-label">Zelador</div>
+          </div>
+          <div class="role-card" data-role="porteiro" onclick="selecionarRole(this)">
+            <div class="role-icon">🔐</div>
+            <div class="role-label">Porteiro</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="campo-apt" style="display:none">
+        <label class="form-label">Seu apartamento</label>
+        <input class="form-input" id="c-apt" type="text" placeholder="Ex: 101"/>
+      </div>
+
+      <button class="btn-primary" id="btn-cadastro" onclick="fazerCadastro()">Criar conta</button>
+      <div class="divider">ou</div>
+      <button class="btn-ghost" onclick="setTab('login')">Já tenho conta</button>
+    </div>
+  </div>
+
+  <!-- TELA: VERIFICAR E-MAIL -->
+  <div class="success-screen" id="verify-screen">
+    <div class="auth-card" style="text-align:center;padding:40px 24px">
+      <div class="success-icon">📧</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px">Verifique seu e-mail</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px">
+        Enviamos um link de confirmação para <strong id="email-enviado" style="color:var(--text)"></strong>.
+        Clique no link para ativar sua conta.
+      </div>
+      <button class="btn-ghost" onclick="setTab('login');document.getElementById('verify-screen').classList.remove('show');document.getElementById('main-screen').style.display='block'">
+        Voltar ao login
+      </button>
+    </div>
+  </div>
+
+  <!-- TELA: RESET DE SENHA -->
+  <div class="reset-screen" id="reset-screen">
+    <div class="auth-card">
+      <div style="font-size:16px;font-weight:800;margin-bottom:6px">Recuperar senha</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:20px">
+        Digite seu e-mail e enviaremos um link para redefinir sua senha.
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input class="form-input" id="r-email" type="email" placeholder="seu@email.com"/>
+      </div>
+      <button class="btn-primary" id="btn-reset" onclick="enviarReset()">Enviar link</button>
+      <button class="btn-ghost" onclick="voltarLogin()">Voltar ao login</button>
+    </div>
+  </div>
+
+  <div class="auth-footer">
+    CondoGest PRO &copy; 2025 · Todos os direitos reservados
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  SUPABASE
+// ══════════════════════════════════════════
+const SUPABASE_URL  = 'https://nwcbtprfsekbgqkgnkya.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53Y2J0cHJmc2VrYmdxa2dua3lhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMTUwMzksImV4cCI6MjA4ODc5MTAzOX0.9rBbRd6WMhoYzhno_nacqHDgRB_X84FZBnMTCd6iS6M'
+const CONDO_ID      = '11111111-0000-0000-0000-000000000001'
+
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_ANON)
+
+let roleSelecionado = 'sindico'
+
+// ══════════════════════════════════════════
+//  CHECAR SESSÃO ATIVA
+// ══════════════════════════════════════════
+;(async () => {
+  const { data: { session } } = await db.auth.getSession()
+  if (session) {
+    await redirecionarPorRole(session.user)
+  }
+})()
+
+// ══════════════════════════════════════════
+//  UTILITÁRIOS
+// ══════════════════════════════════════════
+function alerta(msg, tipo = 'error') {
+  const el = document.getElementById('alert')
+  el.textContent = msg
+  el.className = 'alert ' + tipo
+  setTimeout(() => el.className = 'alert', 5000)
+}
+
+function setLoading(btnId, loading, textoOriginal) {
+  const btn = document.getElementById(btnId)
+  btn.disabled = loading
+  btn.innerHTML = loading
+    ? `<span class="spinner-sm"></span> Aguarde...`
+    : textoOriginal
+}
+
+function toggleSenha(inputId, icon) {
+  const input = document.getElementById(inputId)
+  if (input.type === 'password') {
+    input.type = 'text'; icon.textContent = '🙈'
+  } else {
+    input.type = 'password'; icon.textContent = '👁️'
+  }
+}
+
+function setTab(tab) {
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login')
+  document.getElementById('tab-cadastro').classList.toggle('active', tab === 'cadastro')
+  document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none'
+  document.getElementById('form-cadastro').style.display = tab === 'cadastro' ? 'block' : 'none'
+  document.getElementById('alert').className = 'alert'
+}
+
+function selecionarRole(el) {
+  document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'))
+  el.classList.add('selected')
+  roleSelecionado = el.dataset.role
+  // Mostra campo de apt só para morador
+  document.getElementById('campo-apt').style.display =
+    roleSelecionado === 'morador' ? 'block' : 'none'
+}
+
+function mostrarReset() {
+  document.getElementById('main-screen').style.display = 'none'
+  document.getElementById('reset-screen').classList.add('show')
+  document.getElementById('alert').className = 'alert'
+}
+
+function voltarLogin() {
+  document.getElementById('reset-screen').classList.remove('show')
+  document.getElementById('main-screen').style.display = 'block'
+}
+
+// ══════════════════════════════════════════
+//  REDIRECIONAR POR ROLE
+// ══════════════════════════════════════════
+async function redirecionarPorRole(user) {
+  // Busca perfil do usuário
+  const { data: perfil } = await db
+    .from('perfis')
+    .select('role, nome, condominio_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!perfil) {
+    // Perfil ainda não configurado
+    alerta('Perfil não encontrado. Contate o síndico.', 'error')
+    await db.auth.signOut()
+    return
+  }
+
+  // Salva info do usuário no localStorage para o painel usar
+  localStorage.setItem('cg_user', JSON.stringify({
+    id: user.id,
+    email: user.email,
+    nome: perfil.nome,
+    role: perfil.role,
+    condominio_id: perfil.condominio_id || CONDO_ID
+  }))
+
+  // Redireciona para o painel
+  window.location.href = 'condogest-live.html'
+}
+
+// ══════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════
+async function fazerLogin() {
+  const email = document.getElementById('l-email').value.trim()
+  const senha = document.getElementById('l-senha').value
+
+  if (!email || !senha) {
+    alerta('Preencha e-mail e senha'); return
+  }
+
+  setLoading('btn-login', true, 'Entrar')
+
+  const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+
+  if (error) {
+    setLoading('btn-login', false, 'Entrar')
+    const msgs = {
+      'Invalid login credentials': 'E-mail ou senha incorretos.',
+      'Email not confirmed':        'Confirme seu e-mail antes de entrar.',
+      'Too many requests':          'Muitas tentativas. Aguarde alguns minutos.',
+    }
+    alerta(msgs[error.message] || error.message)
+    return
+  }
+
+  alerta('Login realizado! Redirecionando...', 'success')
+  await redirecionarPorRole(data.user)
+  setLoading('btn-login', false, 'Entrar')
+}
+
+// ══════════════════════════════════════════
+//  CADASTRO
+// ══════════════════════════════════════════
+async function fazerCadastro() {
+  const nome   = document.getElementById('c-nome').value.trim()
+  const email  = document.getElementById('c-email').value.trim()
+  const tel    = document.getElementById('c-tel').value.trim()
+  const senha  = document.getElementById('c-senha').value
+  const senha2 = document.getElementById('c-senha2').value
+  const apt    = document.getElementById('c-apt').value.trim()
+
+  // Validações
+  if (!nome || !email || !senha) {
+    alerta('Preencha todos os campos obrigatórios'); return
+  }
+  if (senha.length < 6) {
+    alerta('A senha deve ter no mínimo 6 caracteres'); return
+  }
+  if (senha !== senha2) {
+    alerta('As senhas não coincidem'); return
+  }
+
+  setLoading('btn-cadastro', true, 'Criar conta')
+
+  // Cria usuário no Supabase Auth
+  const { data, error } = await db.auth.signUp({
+    email,
+    password: senha,
+    options: {
+      data: { nome } // metadata usado pelo trigger
+    }
+  })
+
+  if (error) {
+    setLoading('btn-cadastro', false, 'Criar conta')
+    const msgs = {
+      'User already registered': 'Este e-mail já está cadastrado.',
+      'Password should be at least 6 characters': 'Senha muito curta.',
+    }
+    alerta(msgs[error.message] || error.message)
+    return
+  }
+
+  // Atualiza perfil com dados extras
+  // O trigger criou o registro — fazemos UPDATE dos campos extras
+  if (data.user) {
+    let unidade_id = null
+    if (roleSelecionado === 'morador' && apt) {
+      const { data: u } = await db.from('unidades')
+        .select('id').eq('condominio_id', CONDO_ID).eq('numero', apt).maybeSingle()
+      if (u) unidade_id = u.id
+    }
+
+    // Aguarda o trigger terminar de criar o perfil
+    await new Promise(r => setTimeout(r, 1000))
+
+    await db.from('perfis').update({
+      nome,
+      telefone: tel || null,
+      role: roleSelecionado,
+      condominio_id: CONDO_ID,
+      unidade_id
+    }).eq('id', data.user.id)
+  }
+
+  setLoading('btn-cadastro', false, 'Criar conta')
+
+  // Se confirmação de e-mail está ativa no Supabase, mostra tela de verificação
+  if (!data.session) {
+    document.getElementById('email-enviado').textContent = email
+    document.getElementById('main-screen').style.display = 'none'
+    document.getElementById('verify-screen').classList.add('show')
+  } else {
+    // Confirmação desativada — já loga direto
+    alerta('Conta criada com sucesso!', 'success')
+    await redirecionarPorRole(data.user)
+  }
+}
+
+// ══════════════════════════════════════════
+//  RESET DE SENHA
+// ══════════════════════════════════════════
+async function enviarReset() {
+  const email = document.getElementById('r-email').value.trim()
+  if (!email) { alerta('Informe seu e-mail'); return }
+
+  setLoading('btn-reset', true, 'Enviar link')
+
+  const { error } = await db.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/condogest-live.html'
+  })
+
+  setLoading('btn-reset', false, 'Enviar link')
+
+  if (error) {
+    alerta(error.message)
+  } else {
+    alerta('Link enviado! Verifique seu e-mail.', 'success')
+    setTimeout(voltarLogin, 3000)
+  }
+}
+
+// ══════════════════════════════════════════
+//  ENTER para submeter
+// ══════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return
+  const loginAtivo = document.getElementById('form-login').style.display !== 'none'
+  if (loginAtivo) fazerLogin()
+  else fazerCadastro()
+})
+</script>
+</body>
+</html>
