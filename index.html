@@ -271,32 +271,21 @@
     <!-- CARD CADASTRO -->
     <div class="auth-card" id="form-cadastro" style="display:none">
       <div class="form-group">
-        <label class="form-label">Nome completo</label>
+        <label class="form-label">Nome completo *</label>
         <input class="form-input" id="c-nome" type="text" placeholder="Seu nome completo"/>
       </div>
       <div class="form-group">
-        <label class="form-label">E-mail</label>
+        <label class="form-label">CPF *</label>
+        <input class="form-input" id="c-cpf" type="text" placeholder="000.000.000-00" maxlength="14" oninput="fmtCPF(this)"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-mail *</label>
         <input class="form-input" id="c-email" type="email" placeholder="seu@email.com" autocomplete="email"/>
       </div>
       <div class="form-group">
-        <label class="form-label">Telefone</label>
-        <input class="form-input" id="c-tel" type="tel" placeholder="(11) 99999-9999"/>
+        <label class="form-label">Celular *</label>
+        <input class="form-input" id="c-tel" type="tel" placeholder="(21) 99999-9999" maxlength="15" oninput="fmtTel(this)"/>
       </div>
-      <div class="form-group">
-        <label class="form-label">Senha</label>
-        <div class="input-wrap">
-          <input class="form-input" id="c-senha" type="password" placeholder="Mínimo 6 caracteres"/>
-          <span class="input-icon" onclick="toggleSenha('c-senha', this)">👁️</span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Confirmar senha</label>
-        <div class="input-wrap">
-          <input class="form-input" id="c-senha2" type="password" placeholder="Repita a senha"/>
-          <span class="input-icon" onclick="toggleSenha('c-senha2', this)">👁️</span>
-        </div>
-      </div>
-
       <div class="form-group">
         <label class="form-label">Seu perfil</label>
         <div class="role-grid">
@@ -318,12 +307,26 @@
           </div>
         </div>
       </div>
-
-      <div class="form-group" id="campo-apt" style="display:none">
-        <label class="form-label">Seu apartamento</label>
+      <div class="form-group" id="campos-morador" style="display:none">
+        <label class="form-label">Bloco</label>
+        <input class="form-input" id="c-bloco" type="text" placeholder="Ex: A, B, 1, 2"/>
+        <label class="form-label" style="margin-top:10px">Apartamento *</label>
         <input class="form-input" id="c-apt" type="text" placeholder="Ex: 101"/>
       </div>
-
+      <div class="form-group">
+        <label class="form-label">Senha *</label>
+        <div class="input-wrap">
+          <input class="form-input" id="c-senha" type="password" placeholder="Mínimo 6 caracteres"/>
+          <span class="input-icon" onclick="toggleSenha('c-senha', this)">👁️</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmar senha *</label>
+        <div class="input-wrap">
+          <input class="form-input" id="c-senha2" type="password" placeholder="Repita a senha"/>
+          <span class="input-icon" onclick="toggleSenha('c-senha2', this)">👁️</span>
+        </div>
+      </div>
       <button class="btn-primary" id="btn-cadastro" onclick="fazerCadastro()">Criar conta</button>
       <div class="divider">ou</div>
       <button class="btn-ghost" onclick="setTab('login')">Já tenho conta</button>
@@ -430,9 +433,24 @@ function selecionarRole(el) {
   document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'))
   el.classList.add('selected')
   roleSelecionado = el.dataset.role
-  // Mostra campo de apt só para morador
-  document.getElementById('campo-apt').style.display =
-    roleSelecionado === 'morador' ? 'block' : 'none'
+  var cm = document.getElementById('campos-morador')
+  if (cm) cm.style.display = roleSelecionado === 'morador' ? 'block' : 'none'
+}
+
+function fmtCPF(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 9) v = v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9)
+  else if (v.length > 6) v = v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6)
+  else if (v.length > 3) v = v.slice(0,3)+'.'+v.slice(3)
+  el.value = v
+}
+
+function fmtTel(el) {
+  var v = el.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 10) v = '('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7)
+  else if (v.length > 6) v = '('+v.slice(0,2)+') '+v.slice(2,6)+'-'+v.slice(6)
+  else if (v.length > 2) v = '('+v.slice(0,2)+') '+v.slice(2)
+  el.value = v
 }
 
 function mostrarReset() {
@@ -513,15 +531,25 @@ async function fazerLogin() {
 // ══════════════════════════════════════════
 async function fazerCadastro() {
   const nome   = document.getElementById('c-nome').value.trim()
+  const cpf    = document.getElementById('c-cpf') ? document.getElementById('c-cpf').value.trim() : ''
   const email  = document.getElementById('c-email').value.trim()
   const tel    = document.getElementById('c-tel').value.trim()
   const senha  = document.getElementById('c-senha').value
   const senha2 = document.getElementById('c-senha2').value
-  const apt    = document.getElementById('c-apt').value.trim()
+  const apt    = document.getElementById('c-apt') ? document.getElementById('c-apt').value.trim() : ''
+  const bloco  = document.getElementById('c-bloco') ? document.getElementById('c-bloco').value.trim() : ''
 
-  // Validações
   if (!nome || !email || !senha) {
     alerta('Preencha todos os campos obrigatórios'); return
+  }
+  if (!cpf || cpf.replace(/\D/g,'').length < 11) {
+    alerta('Informe um CPF válido'); return
+  }
+  if (!tel || tel.replace(/\D/g,'').length < 10) {
+    alerta('Informe um celular válido'); return
+  }
+  if (roleSelecionado === 'morador' && !apt) {
+    alerta('Informe o número do apartamento'); return
   }
   if (senha.length < 6) {
     alerta('A senha deve ter no mínimo 6 caracteres'); return
@@ -564,12 +592,17 @@ async function fazerCadastro() {
     // Aguarda o trigger terminar de criar o perfil
     await new Promise(r => setTimeout(r, 1000))
 
+    var aptFull = bloco ? bloco + '-' + apt : apt
     await db.from('perfis').update({
       nome,
+      cpf: cpf.replace(/\D/g,'') || null,
       telefone: tel || null,
       role: roleSelecionado,
       condominio_id: CONDO_ID,
-      unidade_id
+      unidade_id,
+      bloco: bloco || null,
+      apartamento: apt || null,
+      pendente_aprovacao: roleSelecionado === 'morador'
     }).eq('id', data.user.id)
   }
 
