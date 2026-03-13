@@ -308,13 +308,9 @@
             <div class="role-icon">🏠</div>
             <div class="role-label">Morador</div>
           </div>
-          <div class="role-card" data-role="zelador" onclick="selecionarRole(this)">
-            <div class="role-icon">🔧</div>
-            <div class="role-label">Zelador</div>
-          </div>
-          <div class="role-card" data-role="porteiro" onclick="selecionarRole(this)">
+          <div class="role-card" id="card-portaria" data-role="portaria" onclick="selecionarRole(this)">
             <div class="role-icon">🔐</div>
-            <div class="role-label">Porteiro</div>
+            <div class="role-label">Portaria</div>
           </div>
         </div>
       </div>
@@ -464,41 +460,59 @@ async function verificarRolesDisponiveis() {
     var CONDO_ID = '11111111-0000-0000-0000-000000000001'
     var r = await db.from('perfis').select('role').eq('condominio_id', CONDO_ID)
     var roles = (r.data || []).map(function(p){ return p.role })
-    var temSindico = roles.indexOf('sindico') !== -1
-    var temSubsindico = roles.indexOf('subsindico') !== -1
-    // Bloquear síndico se já existe
-    var cardSind = document.getElementById('card-sindico')
-    if (cardSind) {
-      if (temSindico) {
-        cardSind.classList.add('bloqueado')
-        cardSind.onclick = function(){ alerta('Já existe um síndico cadastrado.'); }
-        cardSind.querySelector('.role-label').textContent = 'Síndico (ocupado)'
-      } else {
-        cardSind.classList.remove('bloqueado')
-        cardSind.onclick = function(){ selecionarRole(this); }
-      }
+    var temSindico    = roles.filter(function(x){ return x==='sindico'; }).length > 0
+    var temSubsindico = roles.filter(function(x){ return x==='subsindico'; }).length > 0
+    var temPortaria   = roles.filter(function(x){ return x==='portaria'; }).length > 0
+
+    function bloquearCard(id, msg, labelOcupado) {
+      var card = document.getElementById(id)
+      if (!card) return
+      card.classList.add('bloqueado')
+      card.setAttribute('data-bloqueado','1')
+      card.querySelector('.role-label').textContent = labelOcupado
+      card.onclick = function(e){ e.stopPropagation(); mostrarAlerta(msg); }
     }
-    // Bloquear subsíndico se já existe
-    var cardSub = document.getElementById('card-subsindico')
-    if (cardSub) {
-      if (temSubsindico) {
-        cardSub.classList.add('bloqueado')
-        cardSub.onclick = function(){ alerta('Já existe um subsíndico cadastrado.'); }
-        cardSub.querySelector('.role-label').textContent = 'Subsíndico (ocupado)'
-      } else {
-        cardSub.classList.remove('bloqueado')
-        cardSub.onclick = function(){ selecionarRole(this); }
-      }
+
+    function liberarCard(id) {
+      var card = document.getElementById(id)
+      if (!card) return
+      card.classList.remove('bloqueado')
+      card.removeAttribute('data-bloqueado')
+      card.onclick = function(){ selecionarRole(card); }
     }
-    // Seleciona morador como padrão se síndico estiver bloqueado
+
+    if (temSindico)    bloquearCard('card-sindico',   'Já existe um síndico cadastrado.',   'Síndico (ocupado)')
+    else               liberarCard('card-sindico')
+
+    if (temSubsindico) bloquearCard('card-subsindico','Já existe um subsíndico cadastrado.','Subsíndico (ocupado)')
+    else               liberarCard('card-subsindico')
+
+    if (temPortaria)   bloquearCard('card-portaria',  'Já existe um cadastro de portaria.', 'Portaria (ocupado)')
+    else               liberarCard('card-portaria')
+
+    // Garante que morador esteja selecionado como padrão
     var cardMor = document.getElementById('card-morador')
-    if (cardMor && !cardMor.classList.contains('selected')) {
+    if (cardMor && !document.querySelector('.role-card.selected')) {
       selecionarRole(cardMor)
     }
   } catch(e) {
-    console.error(e)
+    console.error('verificarRoles erro:', e)
   }
   if (loading) loading.style.display = 'none'
+}
+
+function mostrarAlerta(msg) {
+  var al = document.getElementById('alerta-role')
+  if (!al) {
+    al = document.createElement('div')
+    al.id = 'alerta-role'
+    al.style.cssText = 'background:var(--red-l);color:var(--red);border:1px solid #f43f5e30;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:10px;'
+    var grid = document.querySelector('.role-grid')
+    grid.parentNode.insertBefore(al, grid)
+  }
+  al.textContent = msg
+  al.style.display = 'block'
+  setTimeout(function(){ al.style.display='none'; }, 3000)
 }
 
 function fmtTel(el) {

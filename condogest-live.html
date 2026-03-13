@@ -429,11 +429,23 @@ async function init(sess) {
     document.getElementById('sb-av').textContent = partes;
     document.getElementById('sb-nm').textContent = usr.nome;
     document.getElementById('sb-rl').textContent = usr.role;
-    if (usr.role === 'morador') {
-      ['fin','ace'].forEach(function(p) {
-        document.querySelectorAll('[data-p="' + p + '"]').forEach(function(el){ el.style.display='none'; });
-      });
+    // Controle de acesso por role
+    var isGestor = (usr.role === 'sindico' || usr.role === 'subsindico');
+    var isMorador = (usr.role === 'morador');
+
+    if (!isGestor) {
+      // Portaria não vê Financeiro (apenas gestores e moradores veem)
+      if (usr.role === 'portaria') {
+        document.querySelectorAll('[data-p="fin"]').forEach(function(el){ el.style.display='none'; });
+      }
     }
+    if (isMorador) {
+      // Morador não vê Acesso (portaria)
+      document.querySelectorAll('[data-p="ace"]').forEach(function(el){ el.style.display='none'; });
+    }
+    // Guarda role globalmente para uso nas telas
+    window._role = usr.role;
+    window._isGestor = isGestor;
     var cd = await db.from('condominios').select('nome').eq('id', CONDO).single();
     if (cd.data) document.getElementById('sb-cn').textContent = cd.data.nome;
     var ar = await db.from('areas_comuns').select('*').eq('condominio_id', CONDO).eq('ativa', true);
@@ -523,11 +535,19 @@ async function sair(){
   window.location.href = 'index.html';
 }
 function fab(){
-  if (cur === 'dash' || cur === 'ace') oM('m-vs');
-  else if (cur === 'fin') toast('Modulo de cobrancas em breve!','in');
-  else if (cur === 'res') { if (calSel) toast('Selecione uma area disponivel no calendario','in'); else toast('Selecione uma data no calendario','in'); }
-  else if (cur === 'asm') oM('m-as');
-  else if (cur === 'bal') document.getElementById('bl-fi').click();
+  var g = window._isGestor;
+  if (cur === 'dash' || cur === 'ace') {
+    if (g) oM('m-vs'); else toast('Apenas sindico/subsindico podem registrar visitantes','er');
+  } else if (cur === 'fin') {
+    if (g) toast('Modulo de cobrancas em breve!','in'); else toast('Acesso restrito','er');
+  } else if (cur === 'res') {
+    if (calSel) toast('Selecione uma area disponivel no calendario','in');
+    else toast('Selecione uma data no calendario','in');
+  } else if (cur === 'asm') {
+    if (g) oM('m-as'); else toast('Apenas sindico/subsindico podem criar assembleias','er');
+  } else if (cur === 'bal') {
+    if (g) document.getElementById('bl-fi').click(); else toast('Acesso restrito','er');
+  }
 }
 
 async function lPg(p) {
@@ -549,9 +569,13 @@ async function lDash() {
   var hj = hoje(), e30 = em(30);
   var mI = hj.slice(0,7)+'-01', mF = hj.slice(0,7)+'-31';
   var r1 = await db.from('cobrancas').select('status,valor,vencimento').eq('condominio_id',CONDO);
-  var r2 = await db.from('reservas').select('*,areas_comuns(nome),unidades(numero)').in('status',['confirmada','pendente']).gte('data_reserva',hj).lte('data_reserva',e30).order('data_reserva').limit(5);
-  var r3 = await db.from('visitantes').select('*').eq('condominio_id',CONDO).is('saida_em',null);
-  var cb = r1.data||[], rs = r2.data||[], vs = r3.data||[];
+  // Reservas: áreas com reservas a partir de hoje (inclui hoje)
+  var r2 = await db.from('reservas').select('*,areas_comuns(nome),unidades(numero)').in('status',['confirmada','pendente']).gte('data_reserva',hj).lte('data_reserva',e30).order('data_reserva').limit(10);
+  // Visitantes: só os que saida_em é NULL de verdade (ainda dentro)
+  var r3 = await db.from('visitantes').select('*').eq('condominio_id',CONDO).gte('entrada_em', hj+'T00:00:00');
+  var cb = r1.data||[], rs = r2.data||[], todosVis = r3.data||[];
+  // Filtra só os que realmente não saíram (saida_em null ou vazio)
+  var vs = todosVis.filter(function(v){ return !v.saida_em || v.saida_em === ''; });
   var pv = cb.filter(function(c){return c.vencimento>=mI&&c.vencimento<=mF;}).reduce(function(s,c){return s+Number(c.valor);},0);
   var ar = cb.filter(function(c){return c.status==='pago'&&c.vencimento>=mI&&c.vencimento<=mF;}).reduce(function(s,c){return s+Number(c.valor);},0);
   var ind = cb.filter(function(c){return c.status!=='pago'&&c.vencimento<hj;});
@@ -560,9 +584,33 @@ async function lDash() {
   document.getElementById('k-in').textContent = ind.length;
   document.getElementById('k-rs').textContent = rs.length;
   document.getElementById('k-vs').textContent = vs.length;
-  document.getElementById('d-in').innerHTML = ind.length ? ind.slice(0,5).map(function(c){ return '<div class="rs- fb"><span class="bld">Venc: '+fD(c.vencimento)+'</span><span class="bld crd">'+fmt(c.valor)+'</span></div>'; }).join('') : '<div class="em"><div class="em-i">&#10003;</div>Sem inadimplentes</div>';
-  document.getElementById('d-rs').innerHTML = rs.length ? '<div class="tw"><table><tbody>'+rs.map(function(r){ return '<tr><td><b>'+(r.areas_comuns?r.areas_comuns.nome:'-')+'</b></td><td>'+fD(r.data_reserva)+'</td><td>'+chip(r.status)+'</td></tr>'; }).join('')+'</tbody></table></div>' : '<div class="em"><div class="em-i">&#128197;</div>Nenhuma reserva</div>';
-  document.getElementById('d-vs').innerHTML = vs.length ? vs.slice(0,5).map(function(v){ return '<div class="rs- fb"><span class="bld">'+v.nome+'</span>'+chip(v.tipo)+'</div>'; }).join('') : '<div class="em"><div class="em-i">&#128272;</div>Nenhum visitante</div>';
+  // Inadimplentes
+  document.getElementById('d-in').innerHTML = ind.length ? ind.slice(0,5).map(function(c){
+    return '<div class="rs- fb"><span class="bld">Venc: '+fD(c.vencimento)+'</span><span class="bld crd">'+fmt(c.valor)+'</span></div>';
+  }).join('') : '<div class="em"><div class="em-i">&#10003;</div>Sem inadimplentes</div>';
+  // Reservas com área e data destacadas
+  document.getElementById('d-rs').innerHTML = rs.length
+    ? rs.map(function(r){
+        var area = r.areas_comuns ? r.areas_comuns.nome : '-';
+        var isHoje = r.data_reserva === hj;
+        var dataBadge = isHoje
+          ? '<span style="background:#f59e0b22;color:#f59e0b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">Hoje</span>'
+          : '<span style="font-size:12px;color:var(--muted2);">'+fD(r.data_reserva)+'</span>';
+        return '<div class="rs- fb" style="padding:10px 0;border-bottom:1px solid var(--border)">'
+          +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<span style="font-size:18px;">&#127963;</span>'
+          +'<div><div class="bld" style="font-size:13px;">'+area+'</div>'+dataBadge+'</div>'
+          +'</div>'
+          +chip(r.status)
+          +'</div>';
+      }).join('')
+    : '<div class="em"><div class="em-i">&#128197;</div>Nenhuma reserva proxima</div>';
+  // Visitantes dentro
+  document.getElementById('d-vs').innerHTML = vs.length
+    ? vs.slice(0,5).map(function(v){
+        return '<div class="rs- fb"><span class="bld">'+v.nome+'</span>'+chip(v.tipo)+'</div>';
+      }).join('')
+    : '<div class="em"><div class="em-i">&#128272;</div>Nenhum visitante no momento</div>';
 }
 
 // FINANCEIRO
@@ -578,6 +626,15 @@ async function lFin() {
   document.getElementById('f-ar').textContent = fmt(ar);
   document.getElementById('f-at').textContent = at.length;
   document.getElementById('f-un').textContent = new Set(cb.map(function(c){return c.unidade_id;})).size;
+  if (!window._isGestor) {
+    // Morador vê resumo financeiro mas sem identificar unidades
+    document.getElementById('f-tb').innerHTML = at.length
+      ? at.map(function(c,i){
+          return '<tr><td data-l="Unidade"><b>Unidade #'+(i+1)+'</b></td><td data-l="Descricao">'+c.descricao+'</td><td data-l="Valor" class="bld crd">'+fmt(c.valor)+'</td><td data-l="Vencimento">'+fD(c.vencimento)+'</td><td data-l="Status">'+chip(c.status)+'</td><td data-l="Acoes"><span class="mu-c sm">restrito</span></td></tr>';
+        }).join('')
+      : '<tr><td colspan="6"><div class="em"><div class="em-i">&#10003;</div>Nenhuma inadimplencia</div></td></tr>';
+    return;
+  }
   document.getElementById('f-tb').innerHTML = at.length ? at.map(function(c){
     return '<tr><td data-l="Unidade"><b>Apt '+(c.unidades?c.unidades.numero:'?')+'</b></td><td data-l="Descricao">'+c.descricao+'</td><td data-l="Valor" class="bld crd">'+fmt(c.valor)+'</td><td data-l="Vencimento">'+fD(c.vencimento)+'</td><td data-l="Status">'+chip(c.status)+'</td><td data-l="Acoes"><div class="fx g8"><button class="btn bs sm">Boleto</button><button class="btn rs sm">Notificar</button></div></td></tr>';
   }).join('') : '<tr><td colspan="6"><div class="em"><div class="em-i">&#10003;</div>Sem inadimplencia</div></td></tr>';
@@ -596,7 +653,7 @@ async function lRes() {
   });
   document.getElementById('r-tb').innerHTML = _res.length ? _res.map(function(rv,i){
     var ac = '';
-    if (rv.status==='pendente') {
+    if (rv.status==='pendente' && window._isGestor) {
       ac = '<button class="btn gs sm" onclick="apR('+i+')">&#10003; Aprovar</button> <button class="btn rs sm" onclick="rcR('+i+')">&#10005; Recusar</button>';
     } else if (rv.status==='confirmada') {
       ac = '<button class="btn rs sm" onclick="canR('+i+')">&#10006; Cancelar</button>';
@@ -815,7 +872,7 @@ async function lAce() {
   document.getElementById('a-hj').textContent = _vis.length;
   document.getElementById('a-tb').innerHTML = _vis.length ? _vis.map(function(v,i){
     var sd = v.saida_em ? '<span class="mu-c">'+fH(v.saida_em)+'</span>' : '<span class="cyw">dentro</span>';
-    var bt = !v.saida_em ? '<button class="btn rs sm" onclick="rgS('+i+')">Registrar Saida</button>' : '';
+    var bt = (!v.saida_em && !window._isMorador) ? '<button class="btn rs sm" onclick="rgS('+i+')">Registrar Saida</button>' : '';
     return '<tr><td data-l="Nome"><b>'+v.nome+'</b></td><td data-l="Documento">'+(v.documento||'-')+'</td><td data-l="Tipo">'+chip(v.tipo)+'</td><td data-l="Entrada" class="cgn">'+fH(v.entrada_em)+'</td><td data-l="Saida">'+sd+'</td><td data-l="Acoes">'+bt+'</td></tr>';
   }).join('') : '<tr><td colspan="6"><div class="em"><div class="em-i">&#128272;</div>Nenhum visitante hoje</div></td></tr>';
 }
