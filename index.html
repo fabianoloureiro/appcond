@@ -130,6 +130,12 @@
   .role-icon { font-size: 22px; margin-bottom: 5px; }
   .role-label { font-size: 11px; font-weight: 700; color: var(--muted2); }
   .role-card.selected .role-label { color: var(--accent); }
+  .role-card.bloqueado {
+    opacity: 0.4; cursor: not-allowed;
+    border-color: var(--border) !important;
+    background: var(--surface) !important;
+  }
+  .role-card.bloqueado .role-label { color: var(--muted) !important; }
 
   /* BUTTON */
   .btn-primary {
@@ -288,12 +294,17 @@
       </div>
       <div class="form-group">
         <label class="form-label">Seu perfil</label>
+        <div id="role-loading" style="font-size:12px;color:var(--muted);margin-bottom:8px">Verificando disponibilidade...</div>
         <div class="role-grid">
-          <div class="role-card selected" data-role="sindico" onclick="selecionarRole(this)">
+          <div class="role-card" id="card-sindico" data-role="sindico" onclick="selecionarRole(this)">
             <div class="role-icon">👔</div>
             <div class="role-label">Síndico</div>
           </div>
-          <div class="role-card" data-role="morador" onclick="selecionarRole(this)">
+          <div class="role-card" id="card-subsindico" data-role="subsindico" onclick="selecionarRole(this)">
+            <div class="role-icon">🤝</div>
+            <div class="role-label">Subsíndico</div>
+          </div>
+          <div class="role-card selected" id="card-morador" data-role="morador" onclick="selecionarRole(this)">
             <div class="role-icon">🏠</div>
             <div class="role-label">Morador</div>
           </div>
@@ -380,7 +391,7 @@ const CONDO_ID      = '11111111-0000-0000-0000-000000000001'
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_ANON)
 
-let roleSelecionado = 'sindico'
+let roleSelecionado = 'morador'
 
 // ══════════════════════════════════════════
 //  CHECAR SESSÃO ATIVA
@@ -424,6 +435,7 @@ function toggleSenha(inputId, icon) {
 function setTab(tab) {
   document.getElementById('tab-login').classList.toggle('active', tab === 'login')
   document.getElementById('tab-cadastro').classList.toggle('active', tab === 'cadastro')
+  if (tab === 'cadastro') verificarRolesDisponiveis();
   document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none'
   document.getElementById('form-cadastro').style.display = tab === 'cadastro' ? 'block' : 'none'
   document.getElementById('alert').className = 'alert'
@@ -443,6 +455,50 @@ function fmtCPF(el) {
   else if (v.length > 6) v = v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6)
   else if (v.length > 3) v = v.slice(0,3)+'.'+v.slice(3)
   el.value = v
+}
+
+async function verificarRolesDisponiveis() {
+  var loading = document.getElementById('role-loading')
+  if (loading) loading.style.display = 'block'
+  try {
+    var CONDO_ID = '11111111-0000-0000-0000-000000000001'
+    var r = await db.from('perfis').select('role').eq('condominio_id', CONDO_ID)
+    var roles = (r.data || []).map(function(p){ return p.role })
+    var temSindico = roles.indexOf('sindico') !== -1
+    var temSubsindico = roles.indexOf('subsindico') !== -1
+    // Bloquear síndico se já existe
+    var cardSind = document.getElementById('card-sindico')
+    if (cardSind) {
+      if (temSindico) {
+        cardSind.classList.add('bloqueado')
+        cardSind.onclick = function(){ alerta('Já existe um síndico cadastrado.'); }
+        cardSind.querySelector('.role-label').textContent = 'Síndico (ocupado)'
+      } else {
+        cardSind.classList.remove('bloqueado')
+        cardSind.onclick = function(){ selecionarRole(this); }
+      }
+    }
+    // Bloquear subsíndico se já existe
+    var cardSub = document.getElementById('card-subsindico')
+    if (cardSub) {
+      if (temSubsindico) {
+        cardSub.classList.add('bloqueado')
+        cardSub.onclick = function(){ alerta('Já existe um subsíndico cadastrado.'); }
+        cardSub.querySelector('.role-label').textContent = 'Subsíndico (ocupado)'
+      } else {
+        cardSub.classList.remove('bloqueado')
+        cardSub.onclick = function(){ selecionarRole(this); }
+      }
+    }
+    // Seleciona morador como padrão se síndico estiver bloqueado
+    var cardMor = document.getElementById('card-morador')
+    if (cardMor && !cardMor.classList.contains('selected')) {
+      selecionarRole(cardMor)
+    }
+  } catch(e) {
+    console.error(e)
+  }
+  if (loading) loading.style.display = 'none'
 }
 
 function fmtTel(el) {
