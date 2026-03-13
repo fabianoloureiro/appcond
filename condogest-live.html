@@ -1043,6 +1043,138 @@ async function rgS(i) {
   await lAce();
 }
 
+// RECLAMACOES
+var _recs = [], _recFil = 'todos';
+
+async function lRec() {
+  var lista = document.getElementById('rec-lista');
+  if (!lista) return;
+  lista.innerHTML = '<div class="em"><div class="em-i">&#8987;</div>Carregando...</div>';
+  var q = db.from('reclamacoes').select('*').eq('condominio_id', CONDO).order('created_at', {ascending: false});
+  // Morador só vê as próprias (a menos que seja anônima de outro)
+  if (!window._isGestor) {
+    q = q.or('anonimo.eq.true,usuario_id.eq.'+_uid);
+  }
+  var r = await q;
+  _recs = r.data || [];
+  renderRec();
+}
+
+function filRec(btn) {
+  document.querySelectorAll('.rec-fil').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  _recFil = btn.getAttribute('data-f');
+  renderRec();
+}
+
+function renderRec() {
+  var lista = document.getElementById('rec-lista');
+  if (!lista) return;
+  var fil = _recs.filter(function(r){
+    if (_recFil === 'todos') return true;
+    if (_recFil === 'aberto') return r.status !== 'resolvido';
+    if (_recFil === 'resolvido') return r.status === 'resolvido';
+    return r.tipo === _recFil;
+  });
+  if (!fil.length) {
+    lista.innerHTML = '<div class="em"><div class="em-i">&#128172;</div>Nenhum registro encontrado</div>';
+    return;
+  }
+  var icones = {reclamacao:'&#128544;', sugestao:'&#128161;', elogio:'&#11088;', outro:'&#128196;'};
+  lista.innerHTML = fil.map(function(r, i){
+    var ic = icones[r.tipo] || '&#128196;';
+    var autor = r.anonimo ? '<span class="mu-c">Anonimo</span>' : '<span class="bld">'+(r.autor_nome||'Usuario')+'</span>';
+    var dt = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR') : '';
+    var statusBadge = r.status === 'resolvido'
+      ? '<span style="background:#10d48e22;color:#10d48e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">Resolvido</span>'
+      : '<span style="background:#f59e0b22;color:#f59e0b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">Em aberto</span>';
+    var resposta = r.resposta
+      ? '<div style="background:var(--surface);border-left:3px solid var(--accent);padding:8px 12px;margin-top:8px;border-radius:0 8px 8px 0;font-size:13px"><span style="font-size:11px;color:var(--muted2);font-weight:700">RESPOSTA DA GESTAO</span><br>'+r.resposta+'</div>'
+      : '';
+    var btnResp = '';
+    if (window._isGestor && r.status !== 'resolvido') {
+      btnResp = '<div style="margin-top:8px;display:flex;gap:8px">'
+        +'<input class="inp" id="resp-'+i+'" placeholder="Escrever resposta..." style="flex:1;font-size:12px">'
+        +'<button class="btn p sm" id="btn-resp-'+i+'">Responder</button>'
+        +'<button class="btn gs sm" id="btn-res-'+i+'">&#10003; Resolver</button>'
+        +'</div>';
+    }
+    return '<div style="padding:14px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'
+      +'<div style="display:flex;gap:10px;align-items:flex-start">'
+      +'<span style="font-size:22px;margin-top:2px">'+ic+'</span>'
+      +'<div>'
+      +'<div style="font-weight:700;font-size:14px">'+r.assunto+'</div>'
+      +'<div style="font-size:12px;color:var(--muted2);margin-top:2px">'+autor+' &middot; '+dt+'</div>'
+      +'<div style="font-size:13px;margin-top:6px;color:var(--text2)">'+r.descricao+'</div>'
+      +resposta
+      +btnResp
+      +'</div>'
+      +'</div>'
+      +statusBadge
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  // Adicionar eventos nos botões após render
+  setTimeout(function(){
+    fil.forEach(function(r, i){
+      var br = document.getElementById('btn-resp-'+i);
+      var bres = document.getElementById('btn-res-'+i);
+      if (br) br.onclick = (function(rid, idx){ return function(){ respRec(rid, idx); }; })(r.id, i);
+      if (bres) bres.onclick = (function(rid){ return function(){ resolverRec(rid); }; })(r.id);
+    });
+  }, 50);
+}
+
+function toggleRec() {
+  var f = document.getElementById('rec-form');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function salvarRec() {
+  var tipo    = document.getElementById('rec-tipo').value;
+  var assunto = document.getElementById('rec-assunto').value.trim();
+  var desc    = document.getElementById('rec-desc').value.trim();
+  var anon    = document.getElementById('rec-anon').checked;
+  if (!assunto || !desc) { toast('Preencha assunto e descricao','er'); return; }
+  var payload = {
+    condominio_id: CONDO,
+    tipo: tipo,
+    assunto: assunto,
+    descricao: desc,
+    anonimo: anon,
+    status: 'aberto',
+    usuario_id: anon ? null : _uid,
+    autor_nome: anon ? null : (_perfil ? _perfil.nome : null)
+  };
+  var r = await db.from('reclamacoes').insert(payload);
+  if (r.error) { toast('Erro: '+r.error.message,'er'); return; }
+  toast('Enviado com sucesso!');
+  document.getElementById('rec-assunto').value = '';
+  document.getElementById('rec-desc').value = '';
+  document.getElementById('rec-anon').checked = false;
+  document.getElementById('rec-form').style.display = 'none';
+  lRec();
+}
+
+async function respRec(id, i) {
+  var txt = document.getElementById('resp-'+i);
+  if (!txt || !txt.value.trim()) { toast('Escreva uma resposta','er'); return; }
+  var r = await db.from('reclamacoes').update({ resposta: txt.value.trim() }).eq('id', id);
+  if (r.error) { toast('Erro','er'); return; }
+  toast('Resposta enviada!');
+  lRec();
+}
+
+async function resolverRec(id) {
+  if (!confirm('Marcar como resolvido?')) return;
+  var r = await db.from('reclamacoes').update({ status: 'resolvido' }).eq('id', id);
+  if (r.error) { toast('Erro','er'); return; }
+  toast('Marcado como resolvido!');
+  lRec();
+}
+
 // CAMERAS
 var _cams = JSON.parse(localStorage.getItem('cams_'+CONDO)||'[]');
 
