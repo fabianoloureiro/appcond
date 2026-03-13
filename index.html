@@ -389,6 +389,11 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON)
 
 let roleSelecionado = 'morador'
 
+// Roda verificação assim que página carrega
+document.addEventListener('DOMContentLoaded', function(){
+  verificarRolesDisponiveis();
+});
+
 // ══════════════════════════════════════════
 //  CHECAR SESSÃO ATIVA
 // ══════════════════════════════════════════
