@@ -595,7 +595,12 @@ async function lRes() {
     calResMap[d].push(rv);
   });
   document.getElementById('r-tb').innerHTML = _res.length ? _res.map(function(rv,i){
-    var ac = rv.status==='pendente' ? '<button class="btn gs sm" onclick="apR('+i+')">&#10003;</button> <button class="btn rs sm" onclick="rcR('+i+')">&#10005;</button>' : '';
+    var ac = '';
+    if (rv.status==='pendente') {
+      ac = '<button class="btn gs sm" onclick="apR('+i+')">&#10003; Aprovar</button> <button class="btn rs sm" onclick="rcR('+i+')">&#10005; Recusar</button>';
+    } else if (rv.status==='confirmada') {
+      ac = '<button class="btn rs sm" onclick="canR('+i+')">&#10006; Cancelar</button>';
+    }
     return '<tr><td data-l="Area"><b>'+(rv.areas_comuns?rv.areas_comuns.nome:'-')+'</b></td><td data-l="Data">'+fD(rv.data_reserva)+'</td><td data-l="Status">'+chip(rv.status)+'</td><td data-l="Acoes"><div class="fx g8">'+ac+'</div></td></tr>';
   }).join('') : '<tr><td colspan="4"><div class="em"><div class="em-i">&#128197;</div>Nenhuma reserva</div></td></tr>';
   if (!calAno) { var ag = new Date(); calAno = ag.getFullYear(); calMes = ag.getMonth(); }
@@ -671,7 +676,12 @@ async function verAreasData(dStr) {
 }
 
 async function svRes(areaId, data, areaNm) {
-  if (!confirm('Confirmar reserva de '+areaNm+' para '+fD(data)+'?')) return;
+  // Busca taxa da área
+  var area = _areas.filter(function(a){ return a.id === areaId; })[0];
+  var taxa = area ? Number(area.taxa_reserva) : 0;
+  var msg = 'Confirmar reserva de '+areaNm+' para '+fD(data)+'?';
+  if (taxa > 0) msg += '\nValor: R$ '+taxa.toFixed(2).replace('.',',')+'\nUm boleto será gerado com vencimento 24h antes da data.';
+  if (!confirm(msg)) return;
   toast('Salvando...','in');
   var ins = await db.from('reservas').insert({
     area_id: areaId,
@@ -682,9 +692,94 @@ async function svRes(areaId, data, areaNm) {
     solicitante_id: usr ? usr.id : null
   });
   if (ins.error) { toast('Erro: '+ins.error.message,'er'); return; }
+  // Gerar boleto simulado se área for paga
+  if (taxa > 0) {
+    var resId = ins.data && ins.data[0] ? ins.data[0].id : null;
+    var dtRes = new Date(data + 'T12:00:00');
+    var dtVenc = new Date(dtRes.getTime() - 24*60*60*1000);
+    var vencISO = dtVenc.toISOString().slice(0,10);
+    var codBarra = gerarCodBarras();
+    // Salva cobrança vinculada à reserva
+    await db.from('cobrancas').insert({
+      condominio_id: CONDO,
+      descricao: 'Reserva ' + areaNm + ' - ' + fD(data),
+      valor: taxa,
+      vencimento: vencISO,
+      status: 'pendente',
+      tipo: 'reserva',
+      referencia_id: resId,
+      codigo_barras: codBarra
+    });
+    // Mostrar modal do boleto
+    setTimeout(function(){ mostrarBoleto(areaNm, data, taxa, vencISO, codBarra, usr ? usr.email : ''); }, 400);
+  }
   toast('Reserva confirmada!');
   await lRes();
   verAreasData(data);
+}
+
+function gerarCodBarras() {
+  var banco = '341'; // Itaú (simulado)
+  var moeda = '9';
+  var nums = '';
+  for (var i = 0; i < 40; i++) nums += Math.floor(Math.random()*10);
+  return banco + moeda + nums;
+}
+
+function mostrarBoleto(areaNm, dataRes, valor, vencimento, codBarras, email) {
+  var linhaD = codBarras.slice(0,9)+'.'+codBarras.slice(9,19)+' '+
+               codBarras.slice(19,29)+'.'+codBarras.slice(29,39)+' '+
+               codBarras.slice(39,40)+' '+codBarras.slice(40);
+  var el = document.getElementById('m-boleto');
+  if (!el) {
+    // Cria modal de boleto dinamicamente
+    var modal = document.createElement('div');
+    modal.className = 'mb';
+    modal.id = 'm-boleto';
+    modal.innerHTML = '<div class="mx" style="max-width:520px"><div class="mh"><div><div class="bld md">&#128190; Boleto Gerado</div><div class="sm mu">Simulacao - integre com Asaas para boleto real</div></div><button class="mc" id="btn-fecha-boleto">&#10005;</button></div><div id="boleto-body"></div></div>';
+    document.getElementById('btn-fecha-boleto').onclick = function(){ cM('m-boleto'); };
+    modal.addEventListener('click', function(e){ if(e.target===this) cM('m-boleto'); });
+    document.body.appendChild(modal);
+    el = modal;
+  }
+  // Adiciona eventos nos botões de fechar após criar o modal
+  setTimeout(function(){
+    var b1 = document.getElementById('btn-fecha-boleto');
+    var b2 = document.getElementById('btn-fechar-boleto2');
+    if (b1) b1.onclick = function(){ cM('m-boleto'); };
+    if (b2) b2.onclick = function(){ cM('m-boleto'); };
+  }, 50);
+  document.getElementById('boleto-body').innerHTML =
+    '<div style="background:var(--bg);border-radius:10px;padding:16px;margin-bottom:16px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+    '<div class="bld" style="font-size:18px;color:var(--gn)">&#127974; BANCO SIMULADO</div>'+
+    '<div class="bld" style="font-size:20px">'+codBarras.slice(0,3)+'</div></div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">BENEFICIÁRIO</div>'+
+    '<div class="bld md" style="margin-bottom:12px">Residencial Primavera — Condomínio</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+    '<div><div style="font-size:11px;color:var(--mu)">PAGADOR</div><div class="bld sm">'+(usr?usr.nome:'Morador')+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--mu)">VENCIMENTO</div><div class="bld sm crd">'+fD(vencimento)+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--mu)">DESCRIÇÃO</div><div class="bld sm">Reserva '+areaNm+' - '+fD(dataRes)+'</div></div>'+
+    '<div><div style="font-size:11px;color:var(--mu)">VALOR</div><div class="bld sm cgn">R$ '+valor.toFixed(2).replace('.',',')+'</div></div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:6px">LINHA DIGITÁVEL</div>'+
+    '<div style="background:var(--card);border:1px solid var(--br);border-radius:8px;padding:10px;font-family:monospace;font-size:12px;letter-spacing:1px;word-break:break-all;color:var(--tx)">'+
+    codBarras.slice(0,5)+'.'+codBarras.slice(5,10)+' '+codBarras.slice(10,15)+'.'+codBarras.slice(15,21)+' '+codBarras.slice(21,26)+'.'+codBarras.slice(26,32)+' '+codBarras.slice(32,33)+' '+codBarras.slice(33)+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px">'+
+    '<button class="btn p" style="flex:1" onclick="copiarLinha()">&#128203; Copiar linha</button>'+
+    '<button class="btn o" id="btn-fechar-boleto2">Fechar</button>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-top:10px;text-align:center">&#9888; Boleto simulado para testes. Para boleto real, integre com Asaas.</div>'+
+    '</div>';
+  oM('m-boleto');
+}
+
+function copiarLinha() {
+  var txt = document.querySelector('#boleto-body [style*="monospace"]');
+  if (txt) {
+    navigator.clipboard.writeText(txt.textContent).then(function(){ toast('Linha copiada!'); });
+  }
 }
 
 async function apR(i) {
@@ -696,6 +791,18 @@ async function rcR(i) {
   var r = await db.from('reservas').update({status:'recusada'}).eq('id',_res[i].id);
   if (r.error) { toast('Erro','er'); return; }
   toast('Recusada.'); lRes();
+}
+
+async function canR(i) {
+  var rv = _res[i];
+  if (!rv) return;
+  var hoje = new Date().toISOString().slice(0,10);
+  if (rv.data_reserva <= hoje) { toast('Nao e possivel cancelar reservas do dia atual ou anteriores.','er'); return; }
+  if (!confirm('Cancelar reserva de '+(rv.areas_comuns?rv.areas_comuns.nome:'')+' em '+fD(rv.data_reserva)+'?')) return;
+  var r = await db.from('reservas').update({status:'cancelada'}).eq('id',rv.id);
+  if (r.error) { toast('Erro ao cancelar','er'); return; }
+  toast('Reserva cancelada!');
+  lRes();
 }
 
 // ACESSO
@@ -769,12 +876,27 @@ async function svAsm() {
 
 // BALANCETES
 async function lBal() {
+  // Busca da tabela
   var r = await db.from('balancetes').select('*').eq('condominio_id',CONDO).order('mes_referencia',{ascending:false});
-  _bal = r.data || [];
-  if (!_bal.length) {
-    var st = await db.storage.from('Balancetes').list('', {limit:100});
-    if (st.data&&st.data.length) _bal = st.data.map(function(f){ return {nome:f.name.replace('.pdf',''),arquivo_url:BURL+f.name,mes_referencia:null}; });
-  }
+  var daBd = r.data || [];
+
+  // Busca SEMPRE do bucket também (para pegar arquivos subidos diretamente)
+  var st = await db.storage.from('Balancetes').list('', {limit:100,sortBy:{column:'created_at',order:'desc'}});
+  var doBucket = st.data || [];
+
+  // Mescla: prioriza registros da tabela, adiciona do bucket que não estão na tabela
+  var urlsNaBd = daBd.map(function(d){ return d.arquivo_url; });
+  var extras = doBucket
+    .filter(function(f){ return f.name && f.name.toLowerCase().endsWith('.pdf'); })
+    .filter(function(f){ return urlsNaBd.indexOf(BURL+f.name) === -1; })
+    .map(function(f){
+      // Tenta extrair mês do nome (ex: 2025-01_balancete.pdf)
+      var mesMatch = f.name.match(/[0-9]{4}[-_][0-9]{2}/);
+      var mes = mesMatch ? mesMatch[1].replace('_','-')+'-01' : null;
+      return { nome: f.name.replace('.pdf','').replace(/^[0-9]{4}[-_][0-9]{2}[-_]/,''), arquivo_url: BURL+f.name, mes_referencia: mes };
+    });
+
+  _bal = daBd.concat(extras);
   document.getElementById('bl-ct').textContent = _bal.length ? '('+_bal.length+' docs)' : '';
   var ls = document.getElementById('bl-ls');
   ls.innerHTML = _bal.length ? _bal.map(function(d,i){
