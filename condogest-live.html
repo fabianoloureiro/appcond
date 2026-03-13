@@ -1561,12 +1561,10 @@ async function iaEnv() {
     for (var i = 0; i < u8.length; i += 8192) {
       b64 += btoa(String.fromCharCode.apply(null, u8.subarray(i,i+8192)));
     }
-    var rp = await fetch('https://api.anthropic.com/v1/messages', {
+    var rp = await fetch('https://nwcbtprfsekbgqkgnkya.supabase.co/functions/v1/ia-proxy', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SKEY},
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
         system:'Voce e um especialista em financas de condominios. Analise o balancete PDF e responda em portugues de forma clara e objetiva. Use R$ para valores.',
         messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:pq}]}]
       })
@@ -1584,6 +1582,115 @@ async function iaEnv() {
   }
   bt.disabled = false;
 }
+
+// ASSISTENTE IA GERAL
+var _assistHist = [];
+var _assistOpen = false;
+
+function toggleAssist() {
+  _assistOpen = !_assistOpen;
+  var m = document.getElementById('m-assist');
+  m.style.display = _assistOpen ? 'flex' : 'none';
+  if (_assistOpen) {
+    var nm = document.getElementById('assist-nome');
+    if (nm && _perfil) nm.textContent = _perfil.nome ? _perfil.nome.split(' ')[0] : 'sindico';
+    document.getElementById('assist-inp').focus();
+  }
+}
+
+function assistSug(txt) {
+  document.getElementById('assist-inp').value = txt;
+  assistEnv();
+}
+
+async function assistEnv() {
+  var inp = document.getElementById('assist-inp');
+  var pq = inp.value.trim();
+  if (!pq) return;
+  inp.value = '';
+  var ch = document.getElementById('assist-ch');
+  var sugs = document.getElementById('assist-sugs');
+  if (sugs) sugs.style.display = 'none';
+  ch.innerHTML += '<div style="background:linear-gradient(135deg,#6366f122,#8b5cf622);border-radius:12px;padding:10px 12px;font-size:13px;align-self:flex-end;max-width:85%;">'+pq+'</div>';
+  var tid = 'at-'+Date.now();
+  ch.innerHTML += '<div id="'+tid+'" style="background:var(--surface);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted2)">&#129302; Pensando...</div>';
+  ch.scrollTop = ch.scrollHeight;
+  _assistHist.push({ role:'user', content: pq });
+  try {
+    var ctx = 'Condominio: Residencial Primavera, 94 unidades. Sindico: Fabiano Loureiro Moraes.';
+    var rp = await fetch('https://nwcbtprfsekbgqkgnkya.supabase.co/functions/v1/ia-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SKEY },
+      body: JSON.stringify({
+        system: 'Voce e um assistente especialista em gestao de condominios brasileiros. '+ctx+' Responda em portugues, de forma clara e objetiva.',
+        messages: _assistHist,
+        max_tokens: 800
+      })
+    });
+    var dt = await rp.json();
+    var th = document.getElementById(tid);
+    if (th) th.remove();
+    var resp = (dt.content && dt.content[0]) ? dt.content[0].text : 'Nao consegui responder.';
+    _assistHist.push({ role:'assistant', content: resp });
+    if (_assistHist.length > 10) _assistHist = _assistHist.slice(-10);
+    ch.innerHTML += '<div style="background:var(--surface);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2);max-width:92%;">'+resp.replace(/\n/g,'<br>')+'</div>';
+    ch.scrollTop = ch.scrollTop = ch.scrollHeight;
+  } catch(e) {
+    var th2 = document.getElementById(tid);
+    if (th2) th2.remove();
+    ch.innerHTML += '<div style="background:var(--surface);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--red)">Erro de conexao.</div>';
+  }
+}
 </script>
+<!-- ASSISTENTE IA FLUTUANTE -->
+<button id="ia-fab" onclick="toggleAssist()" style="
+  position:fixed;bottom:80px;right:20px;width:52px;height:52px;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  border:none;border-radius:50%;cursor:pointer;
+  box-shadow:0 4px 20px #6366f155;
+  font-size:22px;z-index:999;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform 0.2s;
+" title="Assistente IA">&#129302;</button>
+
+<div id="m-assist" style="
+  display:none;position:fixed;bottom:140px;right:20px;
+  width:340px;max-height:500px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;box-shadow:0 8px 40px #00000066;
+  z-index:1000;flex-direction:column;overflow:hidden;
+">
+  <div style="padding:14px 16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">&#129302;</span>
+      <div>
+        <div style="font-weight:700;color:#fff;font-size:14px">Assistente CondoGest</div>
+        <div style="font-size:11px;color:#ffffff99">Powered by Claude AI</div>
+      </div>
+    </div>
+    <button onclick="toggleAssist()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px">&#10005;</button>
+  </div>
+  <div id="assist-ch" style="flex:1;overflow-y:auto;padding:12px;min-height:260px;max-height:320px;display:flex;flex-direction:column;gap:8px">
+    <div style="background:var(--surface);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2)">
+      Ola, <b id="assist-nome">sindico</b>! Sou seu assistente de gestao. Posso ajudar com financas, reservas, regras de condominio e muito mais. Como posso ajudar?
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" id="assist-sugs">
+      <button class="btn o sm" style="font-size:11px" onclick="assistSug('Como reduzir a inadimplencia?')">Reduzir inadimplencia</button>
+      <button class="btn o sm" style="font-size:11px" onclick="assistSug('Quais sao as obrigacoes do sindico?')">Obrigacoes do sindico</button>
+      <button class="btn o sm" style="font-size:11px" onclick="assistSug('Como fazer uma assembleia?')">Como fazer assembleia</button>
+      <button class="btn o sm" style="font-size:11px" onclick="assistSug('Dicas de gestao de condominio')">Dicas de gestao</button>
+    </div>
+  </div>
+  <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:8px">
+    <input id="assist-inp" class="inp" placeholder="Pergunte algo..." style="flex:1;font-size:13px;padding:8px 12px"
+      onkeydown="if(event.key==='Enter') assistEnv()">
+    <button onclick="assistEnv()" style="
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      border:none;border-radius:10px;padding:8px 14px;
+      color:#fff;font-size:16px;cursor:pointer;
+    ">&#10148;</button>
+  </div>
+</div>
+
 </body>
 </html>
