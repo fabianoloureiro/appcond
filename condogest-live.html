@@ -585,9 +585,29 @@ async function lDash() {
   document.getElementById('k-rs').textContent = rs.length;
   document.getElementById('k-vs').textContent = vs.length;
   // Inadimplentes
-  document.getElementById('d-in').innerHTML = ind.length ? ind.slice(0,5).map(function(c){
-    return '<div class="rs- fb"><span class="bld">Venc: '+fD(c.vencimento)+'</span><span class="bld crd">'+fmt(c.valor)+'</span></div>';
-  }).join('') : '<div class="em"><div class="em-i">&#10003;</div>Sem inadimplentes</div>';
+  var totalInd = ind.reduce(function(s,c){ return s+Number(c.valor); }, 0);
+  // Contar unidades únicas inadimplentes
+  var unidsInad = {};
+  ind.forEach(function(c){ if (c.unidade_id) unidsInad[c.unidade_id] = true; });
+  var nUnids = Object.keys(unidsInad).length || ind.length;
+  var resumoInad = ind.length
+    ? '<div style="display:flex;gap:16px;padding:10px 0 14px;border-bottom:1px solid var(--border);margin-bottom:8px">'
+      +'<div style="flex:1;text-align:center">'
+      +'<div style="font-size:22px;font-weight:800;color:var(--red)">'+nUnids+'</div>'
+      +'<div style="font-size:11px;color:var(--muted2);font-weight:600">UNIDADES</div>'
+      +'</div>'
+      +'<div style="width:1px;background:var(--border)"></div>'
+      +'<div style="flex:1;text-align:center">'
+      +'<div style="font-size:22px;font-weight:800;color:var(--red)">'+fmt(totalInd)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted2);font-weight:600">TOTAL EM ABERTO</div>'
+      +'</div>'
+      +'</div>'
+    : '';
+  document.getElementById('d-in').innerHTML = ind.length
+    ? resumoInad + ind.slice(0,5).map(function(c){
+        return '<div class="rs- fb"><span class="bld">Venc: '+fD(c.vencimento)+'</span><span class="bld crd">'+fmt(c.valor)+'</span></div>';
+      }).join('')
+    : '<div class="em"><div class="em-i">&#10003;</div>Sem inadimplentes</div>';
   // Reservas com área e data destacadas
   document.getElementById('d-rs').innerHTML = rs.length
     ? rs.map(function(r){
