@@ -390,8 +390,9 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON)
 let roleSelecionado = 'morador'
 
 // Roda verificação assim que página carrega
-document.addEventListener('DOMContentLoaded', function(){
-  verificarRolesDisponiveis();
+// Usando timeout garante que o DOM e Supabase estão prontos
+window.addEventListener('load', function(){
+  setTimeout(verificarRolesDisponiveis, 300);
 });
 
 // ══════════════════════════════════════════

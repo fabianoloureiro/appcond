@@ -6,6 +6,7 @@
 <title>CondoGest PRO</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0d1117;--sf:#161b24;--card:#1c2333;--br:#253047;--ac:#3b82f6;--acl:#3b82f618;--gn:#10d48e;--gnl:#10d48e20;--rd:#f43f5e;--rdl:#f43f5e20;--yw:#fbbf24;--ywl:#fbbf2420;--pu:#a78bfa;--pul:#a78bfa20;--tx:#e2e8f0;--mu:#64748b;--mu2:#94a3b8;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -225,6 +226,34 @@ select.fi option{background:var(--card);}
         <div class="kp rd"><div class="ki rd">&#9888;</div><div class="kl">Em Atraso</div><div class="kv rd" id="f-at">—</div></div>
         <div class="kp pu"><div class="ki pu">&#127974;</div><div class="kl">Unidades</div><div class="kv pu" id="f-un">—</div></div>
       </div>
+      <!-- GRAFICOS DEMONSTRATIVO -->
+      <div class="cd" id="fin-graficos">
+        <div class="cd-t" style="display:flex;justify-content:space-between;align-items:center">
+          <span>&#128200; Demonstrativo Contabil</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn o sm graf-per on" data-p="6" onclick="setGrafPer(this)">6 meses</button>
+            <button class="btn o sm graf-per" data-p="12" onclick="setGrafPer(this)">12 meses</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+          <!-- Receita x Inadimplência -->
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:8px">ARRECADADO vs INADIMPLENTE (R$)</div>
+            <canvas id="graf-receita" height="200"></canvas>
+          </div>
+          <!-- Pizza status -->
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:8px">STATUS DAS COBRANCAS</div>
+            <canvas id="graf-status" height="200"></canvas>
+          </div>
+        </div>
+        <!-- Evolução mensal linha -->
+        <div style="margin-top:20px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted2);margin-bottom:8px">EVOLUCAO MENSAL — ARRECADACAO (R$)</div>
+          <canvas id="graf-evolucao" height="120"></canvas>
+        </div>
+      </div>
+
       <!-- Lançar cobrança (só gestor) -->
       <div class="cd" id="fin-lanc-box">
         <div class="cd-t" style="display:flex;justify-content:space-between;align-items:center">
@@ -748,9 +777,11 @@ async function lDash() {
 
 // FINANCEIRO
 async function lFin() {
-  // Mostrar form lançamento só para gestores
+  // Mostrar form lançamento e gráficos só para gestores
   var lancBox = document.getElementById('fin-lanc-box');
   if (lancBox) lancBox.style.display = window._isGestor ? 'block' : 'none';
+  // Gráficos visíveis para todos
+  renderGraficos();
   var hj = hoje(), mI = hj.slice(0,7)+'-01', mF = hj.slice(0,7)+'-31';
   var r = await db.from('cobrancas').select('*,unidades(numero)').eq('condominio_id',CONDO).order('vencimento');
   var cb = r.data||[];
@@ -1219,6 +1250,130 @@ function delCam(i) {
   _cams.splice(i,1);
   localStorage.setItem('cams_'+CONDO, JSON.stringify(_cams));
   lCam();
+}
+
+// GRAFICOS FINANCEIROS
+var _grafPer = 6;
+var _chartReceita = null, _chartStatus = null, _chartEvolucao = null;
+
+function setGrafPer(btn) {
+  document.querySelectorAll('.graf-per').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  _grafPer = parseInt(btn.getAttribute('data-p'));
+  renderGraficos();
+}
+
+function getMeses(n) {
+  var meses = [];
+  var d = new Date();
+  for (var i = n-1; i >= 0; i--) {
+    var dt = new Date(d.getFullYear(), d.getMonth()-i, 1);
+    meses.push(dt.toISOString().slice(0,7)); // YYYY-MM
+  }
+  return meses;
+}
+
+function nomeMes(ym) {
+  var mns = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var p = ym.split('-');
+  return mns[parseInt(p[1])-1]+'/'+p[0].slice(2);
+}
+
+async function renderGraficos() {
+  var meses = getMeses(_grafPer);
+  var mI = meses[0]+'-01';
+  var mF = meses[meses.length-1]+'-31';
+
+  var r = await db.from('cobrancas').select('status,valor,vencimento').eq('condominio_id',CONDO)
+    .gte('vencimento', mI).lte('vencimento', mF);
+  var cb = r.data || [];
+
+  // Dados por mês
+  var arrecadado = [], inadimplente = [];
+  meses.forEach(function(m){
+    var do_mes = cb.filter(function(c){ return c.vencimento && c.vencimento.slice(0,7) === m; });
+    arrecadado.push(do_mes.filter(function(c){ return c.status === 'pago'; }).reduce(function(s,c){ return s+Number(c.valor); },0));
+    inadimplente.push(do_mes.filter(function(c){ return c.status !== 'pago' && c.vencimento < new Date().toISOString().slice(0,10); }).reduce(function(s,c){ return s+Number(c.valor); },0));
+  });
+
+  // Status geral
+  var pago = cb.filter(function(c){ return c.status==='pago'; }).reduce(function(s,c){ return s+Number(c.valor); },0);
+  var pend = cb.filter(function(c){ return c.status==='pendente'; }).reduce(function(s,c){ return s+Number(c.valor); },0);
+  var atras = cb.filter(function(c){ return c.status!=='pago' && c.vencimento < new Date().toISOString().slice(0,10); }).reduce(function(s,c){ return s+Number(c.valor); },0);
+
+  var labels = meses.map(nomeMes);
+  var cor1 = '#10d48e', cor2 = '#f43f5e', cor3 = '#f59e0b', cor4 = '#6366f1';
+  var gridCol = 'rgba(255,255,255,0.06)', txtCol = '#8b949e';
+
+  var baseOpts = {
+    responsive: true,
+    plugins: { legend: { labels: { color: txtCol, font: { size: 11 } } } },
+    scales: {
+      x: { ticks: { color: txtCol, font: { size: 10 } }, grid: { color: gridCol } },
+      y: { ticks: { color: txtCol, font: { size: 10 }, callback: function(v){ return 'R$'+v.toLocaleString('pt-BR'); } }, grid: { color: gridCol } }
+    }
+  };
+
+  // Gráfico 1 — Barras Arrecadado vs Inadimplente
+  var ctx1 = document.getElementById('graf-receita');
+  if (ctx1) {
+    if (_chartReceita) _chartReceita.destroy();
+    _chartReceita = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Arrecadado', data: arrecadado, backgroundColor: cor1+'99', borderColor: cor1, borderWidth: 1, borderRadius: 4 },
+          { label: 'Inadimplente', data: inadimplente, backgroundColor: cor2+'99', borderColor: cor2, borderWidth: 1, borderRadius: 4 }
+        ]
+      },
+      options: Object.assign({}, baseOpts, { plugins: Object.assign({}, baseOpts.plugins, { legend: { position: 'top', labels: { color: txtCol } } }) })
+    });
+  }
+
+  // Gráfico 2 — Pizza status
+  var ctx2 = document.getElementById('graf-status');
+  if (ctx2) {
+    if (_chartStatus) _chartStatus.destroy();
+    _chartStatus = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pago', 'Pendente', 'Em atraso'],
+        datasets: [{ data: [pago, pend, atras], backgroundColor: [cor1+'cc', cor3+'cc', cor2+'cc'], borderColor: ['#0d1117'], borderWidth: 2 }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: txtCol, font: { size: 11 }, padding: 12 } },
+          tooltip: { callbacks: { label: function(ctx){ return ' R$ '+Number(ctx.raw).toLocaleString('pt-BR',{minimumFractionDigits:2}); } } }
+        }
+      }
+    });
+  }
+
+  // Gráfico 3 — Linha evolução
+  var ctx3 = document.getElementById('graf-evolucao');
+  if (ctx3) {
+    if (_chartEvolucao) _chartEvolucao.destroy();
+    _chartEvolucao = new Chart(ctx3, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Arrecadacao',
+          data: arrecadado,
+          borderColor: cor4,
+          backgroundColor: cor4+'22',
+          borderWidth: 2,
+          pointBackgroundColor: cor4,
+          pointRadius: 4,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: Object.assign({}, baseOpts)
+    });
+  }
 }
 
 // LANCAMENTO DE COBRANCA
