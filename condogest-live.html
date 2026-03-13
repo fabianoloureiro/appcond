@@ -176,6 +176,10 @@ select.fi option{background:var(--card);}
     <div class="si" data-p="asm" onclick="go('asm')">&#128379; Assembleias</div>
     <div class="sb-gr">Documentos</div>
     <div class="si" data-p="bal" onclick="go('bal')">&#128196; Balancetes</div>
+    <div class="sb-gr">Seguranca</div>
+    <div class="si" data-p="cam" onclick="go('cam')">&#128247; Cameras</div>
+    <div class="sb-gr">Comunicacao</div>
+    <div class="si" data-p="rec" onclick="go('rec')">&#128172; Reclamacoes</div>
   </nav>
   <div class="sb-ft">
     <div class="sb-us">
@@ -220,6 +224,37 @@ select.fi option{background:var(--card);}
         <div class="kp gn"><div class="ki gn">&#10003;</div><div class="kl">Arrecadado</div><div class="kv gn" id="f-ar">—</div></div>
         <div class="kp rd"><div class="ki rd">&#9888;</div><div class="kl">Em Atraso</div><div class="kv rd" id="f-at">—</div></div>
         <div class="kp pu"><div class="ki pu">&#127974;</div><div class="kl">Unidades</div><div class="kv pu" id="f-un">—</div></div>
+      </div>
+      <!-- Lançar cobrança (só gestor) -->
+      <div class="cd" id="fin-lanc-box">
+        <div class="cd-t" style="display:flex;justify-content:space-between;align-items:center">
+          <span>&#128203; Lancamento de Cobranca</span>
+          <button class="btn o sm" onclick="toggleLanc()">&#43; Nova</button>
+        </div>
+        <div id="fin-lanc-form" style="display:none;margin-top:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label class="form-l">Apartamento</label>
+              <select class="inp" id="lanc-apt"></select>
+            </div>
+            <div>
+              <label class="form-l">Descricao</label>
+              <input class="inp" id="lanc-desc" placeholder="Ex: Condominio Jan/2025">
+            </div>
+            <div>
+              <label class="form-l">Valor (R$)</label>
+              <input class="inp" id="lanc-val" type="number" step="0.01" placeholder="0,00">
+            </div>
+            <div>
+              <label class="form-l">Vencimento</label>
+              <input class="inp" id="lanc-venc" type="date">
+            </div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn p" onclick="salvarLanc()">&#128190; Salvar Cobranca</button>
+            <button class="btn o" onclick="toggleLanc()">Cancelar</button>
+          </div>
+        </div>
       </div>
       <div class="cd"><div class="cd-t">Cobrancas em Atraso</div>
         <div class="tw"><table><thead><tr><th>Unidade</th><th>Descricao</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Acoes</th></tr></thead><tbody id="f-tb"></tbody></table></div>
@@ -299,6 +334,82 @@ select.fi option{background:var(--card);}
       <div class="cd">
         <div class="cd-t">Documentos <span class="sm-t mu-c" id="bl-ct"></span></div>
         <div id="bl-ls"><div class="em"><div class="em-i">&#128196;</div>Nenhum balancete</div></div>
+      </div>
+    </div>
+
+    <!-- RECLAMACOES -->
+    <div class="pg" id="pg-rec">
+      <!-- Form nova reclamação (todos podem abrir) -->
+      <div class="cd">
+        <div class="cd-t" style="display:flex;justify-content:space-between;align-items:center">
+          <span>&#128172; Reclamacoes e Sugestoes</span>
+          <button class="btn p sm" onclick="toggleRec()">&#43; Nova</button>
+        </div>
+        <div id="rec-form" style="display:none;margin-top:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label class="form-l">Tipo</label>
+              <select class="inp" id="rec-tipo">
+                <option value="reclamacao">&#128544; Reclamacao</option>
+                <option value="sugestao">&#128161; Sugestao</option>
+                <option value="elogio">&#11088; Elogio</option>
+                <option value="outro">&#128196; Outro</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-l">Assunto</label>
+              <input class="inp" id="rec-assunto" placeholder="Ex: Barulho no corredor">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="form-l">Descricao</label>
+            <textarea class="inp" id="rec-desc" rows="3" placeholder="Descreva com detalhes..." style="resize:vertical"></textarea>
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="form-l" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="rec-anon" style="width:16px;height:16px">
+              Enviar anonimamente
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn p" onclick="salvarRec()">&#128229; Enviar</button>
+            <button class="btn o" onclick="toggleRec()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <!-- Filtros (gestor vê todos, morador vê só os seus) -->
+      <div class="cd" style="margin-top:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn o sm rec-fil on" data-f="todos" onclick="filRec(this)">Todos</button>
+          <button class="btn o sm rec-fil" data-f="reclamacao" onclick="filRec(this)">&#128544; Reclamacoes</button>
+          <button class="btn o sm rec-fil" data-f="sugestao" onclick="filRec(this)">&#128161; Sugestoes</button>
+          <button class="btn o sm rec-fil" data-f="elogio" onclick="filRec(this)">&#11088; Elogios</button>
+          <button class="btn o sm rec-fil" data-f="aberto" onclick="filRec(this)">&#128308; Em aberto</button>
+          <button class="btn o sm rec-fil" data-f="resolvido" onclick="filRec(this)">&#128994; Resolvidos</button>
+        </div>
+        <div id="rec-lista"></div>
+      </div>
+    </div>
+
+    <!-- CAMERAS -->
+    <div class="pg" id="pg-cam">
+      <div class="cd">
+        <div class="cd-t">&#128247; Cameras ao Vivo</div>
+        <div id="cam-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:8px"></div>
+      </div>
+      <!-- Adicionar câmera (só gestor) -->
+      <div class="cd" id="cam-add-box" style="display:none;margin-top:16px">
+        <div class="cd-t">Adicionar Camera</div>
+        <div class="fx g8" style="flex-direction:column">
+          <input class="inp" id="cam-nome" placeholder="Nome da camera (ex: Portaria Principal)">
+          <input class="inp" id="cam-url" placeholder="URL do stream (RTSP, HLS ou embed)">
+          <select class="inp" id="cam-tipo">
+            <option value="embed">Embed / iFrame (YouTube, Dahua web)</option>
+            <option value="hls">HLS (.m3u8)</option>
+            <option value="img">Snapshot (imagem atualizada)</option>
+          </select>
+          <button class="btn p" onclick="addCam()">&#10003; Salvar Camera</button>
+        </div>
       </div>
     </div>
 
@@ -500,7 +611,7 @@ function hoje() { return new Date().toISOString().slice(0,10); }
 function em(n) { return new Date(Date.now()+n*864e5).toISOString().slice(0,10); }
 
 // NAVEGACAO
-var PM = {dash:['Dashboard','Visao geral'],fin:['Financeiro','Cobrancas'],res:['Reservas','Areas comuns'],ace:['Acesso','Portaria'],asm:['Assembleias','Votacoes'],bal:['Balancetes','Documentos']};
+var PM = {dash:['Dashboard','Visao geral'],fin:['Financeiro','Cobrancas'],res:['Reservas','Areas comuns'],ace:['Acesso','Portaria'],asm:['Assembleias','Votacoes'],bal:['Balancetes','Documentos'],cam:['Cameras','Monitoramento'],rec:['Reclamacoes e Sugestoes','Comunicacao']};
 
 async function go(p) {
   cur = p;
@@ -558,6 +669,8 @@ async function lPg(p) {
     else if (p==='ace') await lAce();
     else if (p==='asm') await lAsm();
     else if (p==='bal') await lBal();
+    else if (p==='cam') lCam();
+    else if (p==='rec') lRec();
   } catch(e) {
     console.error(e);
     toast('Erro ao carregar dados','er');
@@ -635,6 +748,9 @@ async function lDash() {
 
 // FINANCEIRO
 async function lFin() {
+  // Mostrar form lançamento só para gestores
+  var lancBox = document.getElementById('fin-lanc-box');
+  if (lancBox) lancBox.style.display = window._isGestor ? 'block' : 'none';
   var hj = hoje(), mI = hj.slice(0,7)+'-01', mF = hj.slice(0,7)+'-31';
   var r = await db.from('cobrancas').select('*,unidades(numero)').eq('condominio_id',CONDO).order('vencimento');
   var cb = r.data||[];
@@ -925,6 +1041,100 @@ async function rgS(i) {
   if (r.error) { toast('Erro ao registrar saida','er'); return; }
   toast('Saida registrada!');
   await lAce();
+}
+
+// CAMERAS
+var _cams = JSON.parse(localStorage.getItem('cams_'+CONDO)||'[]');
+
+function lCam() {
+  var grid = document.getElementById('cam-grid');
+  if (!grid) return;
+  var addBox = document.getElementById('cam-add-box');
+  if (addBox) addBox.style.display = window._isGestor ? 'block' : 'none';
+  if (!_cams.length) {
+    grid.innerHTML = '<div class="em" style="grid-column:1/-1"><div class="em-i">&#128247;</div>Nenhuma camera cadastrada'+(window._isGestor ? '<br><span class="sm mu">Use o formulario abaixo para adicionar</span>' : '')+'</div>';
+    return;
+  }
+  grid.innerHTML = _cams.map(function(c,i){
+    var preview = '';
+    if (c.tipo === 'embed') {
+      preview = '<iframe src="'+c.url+'" style="width:100%;height:180px;border:none;border-radius:8px" allowfullscreen></iframe>';
+    } else if (c.tipo === 'img') {
+      preview = '<img src="'+c.url+'" style="width:100%;height:180px;object-fit:cover;border-radius:8px"/>';
+    } else {
+      preview = '<div style="background:#000;height:180px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">HLS: '+c.url+'</div>';
+    }
+    var del = window._isGestor ? '<button class="btn rs sm" style="margin-top:8px" onclick="delCam('+i+')">&#128465; Remover</button>' : '';
+    return '<div class="cd" style="padding:12px"><div style="font-weight:700;margin-bottom:8px">&#128247; '+c.nome+'</div>'+preview+del+'</div>';
+  }).join('');
+}
+
+function addCam() {
+  var nome = document.getElementById('cam-nome').value.trim();
+  var url  = document.getElementById('cam-url').value.trim();
+  var tipo = document.getElementById('cam-tipo').value;
+  if (!nome || !url) { toast('Preencha nome e URL','er'); return; }
+  _cams.push({ nome: nome, url: url, tipo: tipo });
+  localStorage.setItem('cams_'+CONDO, JSON.stringify(_cams));
+  document.getElementById('cam-nome').value = '';
+  document.getElementById('cam-url').value = '';
+  toast('Camera adicionada!');
+  lCam();
+}
+
+function delCam(i) {
+  if (!confirm('Remover camera '+_cams[i].nome+'?')) return;
+  _cams.splice(i,1);
+  localStorage.setItem('cams_'+CONDO, JSON.stringify(_cams));
+  lCam();
+}
+
+// LANCAMENTO DE COBRANCA
+function toggleLanc() {
+  var f = document.getElementById('fin-lanc-form');
+  if (!f) return;
+  var show = f.style.display === 'none';
+  f.style.display = show ? 'block' : 'none';
+  if (show) carregarUnidadesLanc();
+}
+
+async function carregarUnidadesLanc() {
+  var sel = document.getElementById('lanc-apt');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  var r = await db.from('unidades').select('id,numero,bloco').eq('condominio_id',CONDO).order('numero');
+  var uns = r.data || [];
+  sel.innerHTML = uns.length
+    ? uns.map(function(u){ return '<option value="'+u.id+'">Apt '+u.numero+(u.bloco?' - Bloco '+u.bloco:'')+'</option>'; }).join('')
+    : '<option value="">Nenhuma unidade cadastrada</option>';
+  // Data padrão: fim do mês atual
+  var hoje = new Date();
+  var fimMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 10);
+  document.getElementById('lanc-venc').value = fimMes.toISOString().slice(0,10);
+}
+
+async function salvarLanc() {
+  if (!window._isGestor) { toast('Acesso restrito','er'); return; }
+  var apt   = document.getElementById('lanc-apt').value;
+  var desc  = document.getElementById('lanc-desc').value.trim();
+  var val   = parseFloat(document.getElementById('lanc-val').value);
+  var venc  = document.getElementById('lanc-venc').value;
+  if (!apt || !desc || !val || !venc) { toast('Preencha todos os campos','er'); return; }
+  var r = await db.from('cobrancas').insert({
+    condominio_id: CONDO,
+    unidade_id: apt,
+    descricao: desc,
+    valor: val,
+    vencimento: venc,
+    status: 'pendente',
+    tipo: 'condominio'
+  });
+  if (r.error) { toast('Erro ao salvar: '+r.error.message,'er'); return; }
+  toast('Cobranca lancada com sucesso!');
+  document.getElementById('lanc-desc').value = '';
+  document.getElementById('lanc-val').value = '';
+  document.getElementById('fin-lanc-form').style.display = 'none';
+  lFin();
 }
 
 // ASSEMBLEIAS
