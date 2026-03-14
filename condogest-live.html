@@ -635,6 +635,86 @@ td {
   .g4 { grid-template-columns: 1fr; }
   .g2 { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════
+   CALENDÁRIO DE RESERVAS
+══════════════════════════════════════════ */
+.cal {
+  background: var(--card);
+  border: 1px solid var(--br);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--sh-sm);
+}
+.cal-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cal-nm {
+  font-size: 15px; font-weight: 700; color: var(--tx);
+}
+.cal-btn {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--card2); border: 1px solid var(--br);
+  color: var(--tx2); cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--tr); line-height: 1;
+}
+.cal-btn:hover { background: var(--acl); color: var(--ac); border-color: var(--ac); }
+.cal-gd {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+}
+.cal-dh {
+  text-align: center; font-size: 10px; font-weight: 700;
+  color: var(--mu); padding: 6px 0; text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.cal-d {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: var(--tr);
+  border: 1.5px solid transparent;
+  position: relative; color: var(--tx2);
+}
+.cal-d:hover:not(.past):not(.empty) {
+  background: var(--acl); color: var(--ac); border-color: var(--ac);
+}
+.cal-d.today {
+  border-color: var(--ac); color: var(--ac); font-weight: 800;
+}
+.cal-d.past { color: var(--mu); cursor: default; opacity: .45; }
+.cal-d.empty { cursor: default; }
+.cal-d.sel {
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-600));
+  color: #fff; border-color: transparent;
+  box-shadow: 0 4px 12px rgba(37,99,235,.3);
+}
+.cal-d.full {
+  background: var(--rdl); color: var(--rd); border-color: var(--rd)44;
+}
+.cal-d.full:hover { background: var(--rd); color: #fff; }
+.cal-dot {
+  position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--yw);
+}
+.cal-d.sel .cal-dot { background: #fff; }
+
+/* Área de seleção */
+#res-areas { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.area-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: var(--r-md);
+  border: 1.5px solid var(--br); background: var(--bg2);
+  transition: var(--tr); cursor: pointer; gap: 12px;
+}
+.area-card:hover { border-color: var(--ac); background: var(--acl); }
+.area-card.oc { border-color: var(--rd)44; background: var(--rdl); cursor: not-allowed; opacity: .7; }
+.area-card.oc:hover { border-color: var(--rd)44; }
+.area-card-info { display: flex; flex-direction: column; gap: 2px; }
+.area-card-nome { font-size: 13px; font-weight: 700; color: var(--tx); }
+.area-card-taxa { font-size: 11px; color: var(--mu2); font-weight: 500; }
 </style>
 </head>
 <body>
@@ -779,6 +859,7 @@ td {
     <div class="pg" id="pg-res">
       <div class="g2">
         <div>
+          <!-- Calendário -->
           <div class="cal">
             <div class="cal-hd">
               <button class="cal-btn" onclick="calPrev()">&#8249;</button>
@@ -787,15 +868,33 @@ td {
             </div>
             <div class="cal-gd" id="cal-gd"></div>
           </div>
+          <!-- Áreas disponíveis -->
           <div class="cd">
-            <div class="cd-t" id="res-dt-tit">Selecione uma data</div>
-            <div id="res-areas"></div>
+            <div class="cd-t">
+              <div class="cd-t-ic">📍</div>
+              <span id="res-dt-tit">Selecione uma data no calendário</span>
+            </div>
+            <div id="res-areas">
+              <div class="em" style="padding:20px">
+                <div class="em-i">📅</div>
+                <span style="font-size:13px">Clique em um dia para ver as áreas disponíveis</span>
+              </div>
+            </div>
           </div>
         </div>
         <div>
+          <!-- Próximas reservas -->
           <div class="cd">
-            <div class="cd-t">Proximas Reservas</div>
-            <div class="tw"><table><thead><tr><th>Area</th><th>Data</th><th>Status</th><th>Acoes</th></tr></thead><tbody id="r-tb"></tbody></table></div>
+            <div class="cd-t">
+              <div class="cd-t-ic">🗓️</div>
+              Próximas Reservas
+            </div>
+            <div class="tw">
+              <table>
+                <thead><tr><th>Área</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody id="r-tb"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1379,11 +1478,13 @@ async function verAreasData(dStr) {
     var motivo = estaOcup ? 'Reservado' : confOcup ? 'Indisponivel por conflito' : '';
     var tx = area.taxa_reserva > 0 ? fmt(area.taxa_reserva)+'/dia' : 'Gratuito';
     var btn = bloq
-      ? '<span class="cp rd">'+motivo+'</span>'
+      ? '<span class="chip" style="background:var(--rdl);color:var(--rd)">'+motivo+'</span>'
       : '<button class="btn p sm" onclick="svRes(\'' + area.id + '\',\'' + dStr + '\',\'' + area.nome + '\')">Reservar</button>';
-    return '<div class="area-card ' + (bloq?'ocup':'livre') + '">' +
-      '<div><div class="bld md-t">'+area.nome+'</div><div class="sm-t mu-c t4">'+tx+'</div>' +
-      (bloq ? '<div class="sm-t crd t4">'+motivo+'</div>' : '<div class="sm-t cgn t4">Disponivel</div>') +
+    return '<div class="area-card ' + (bloq?'oc':'') + '">' +
+      '<div class="area-card-info">' +
+      '<div class="area-card-nome">'+area.nome+'</div>' +
+      '<div class="area-card-taxa">'+tx+'</div>' +
+      (bloq ? '<div class="sm crd" style="margin-top:3px">'+motivo+'</div>' : '<div class="sm cgn" style="margin-top:3px">✓ Disponível</div>') +
       '</div>' + btn + '</div>';
   }).join('');
 }
