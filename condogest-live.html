@@ -2223,19 +2223,23 @@ async function assistEnv() {
   _assistHist.push({ role:'user', content: pq });
   try {
     var ctx = 'Condominio: Residencial Primavera, 94 unidades. Sindico: Fabiano Loureiro Moraes.';
-    var rp = await fetch('https://nwcbtprfsekbgqkgnkya.supabase.co/functions/v1/ia-proxy', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+SKEY },
-      body: JSON.stringify({
-        system: 'Voce e um assistente especialista em gestao de condominios brasileiros. '+ctx+' Responda em portugues, de forma clara e objetiva.',
-        messages: _assistHist,
-        max_tokens: 800
-      })
-    });
-    var dt = await rp.json();
-    var th = document.getElementById(tid);
-    if (th) th.remove();
-    var resp = (dt.content && dt.content[0]) ? dt.content[0].text : 'Nao consegui responder.';
+    var msgs = _assistHist.map(function(m) {
+  return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
+});
+var rp = await fetch(
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyDkEqX20sDsmkrcm25xz3Ipw_bG6XrlzfY',
+  { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: 'Voce e um assistente especialista em gestao de condominios brasileiros. Condominio: Residencial Primavera, 94 unidades. Sindico: Fabiano Loureiro Moraes. Responda em portugues, de forma clara e objetiva.' }] },
+      contents: msgs,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+    })
+  }
+);
+var dt = await rp.json();
+var th = document.getElementById(tid);
+if (th) th.remove();
+var resp = dt?.candidates?.[0]?.content?.parts?.[0]?.text || 'Nao consegui responder.';
     _assistHist.push({ role:'assistant', content: resp });
     if (_assistHist.length > 10) _assistHist = _assistHist.slice(-10);
     ch.innerHTML += '<div style="background:var(--surface);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2);max-width:92%;">'+resp.replace(/\n/g,'<br>')+'</div>';
